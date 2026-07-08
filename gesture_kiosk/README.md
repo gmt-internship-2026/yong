@@ -49,6 +49,7 @@ gesture_kiosk/
 ## Jetson Orin Nano 설치
 
 > 상세 단계별 가이드: **[docs/JETSON_SETUP.md](docs/JETSON_SETUP.md)** (클론 인증·전용 PyTorch 휠·문제 해결 포함)
+> 개발 PC(VS Code) 셋업: **[docs/CODE_SETUP.md](docs/CODE_SETUP.md)**
 
 ```bash
 # 1) JetPack 6.x 기준. PyTorch는 NVIDIA 제공 Jetson용 휠 사용

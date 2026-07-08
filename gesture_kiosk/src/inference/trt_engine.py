@@ -27,12 +27,16 @@ class Detection:
 
 
 def _resolve_device(backend):
-    # .engine은 GPU 전용. torch 백엔드는 CUDA가 없으면 CPU로 동작(개발 PC용)
+    # .engine은 GPU 전용. torch 백엔드는 CUDA(Jetson) → MPS(맥 GPU) → CPU 순으로 자동 선택
     if backend == "engine":
         return 0
     import torch
 
-    return 0 if torch.cuda.is_available() else "cpu"
+    if torch.cuda.is_available():
+        return 0
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
 
 class GestureDetector:
