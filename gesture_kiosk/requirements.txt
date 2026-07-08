@@ -1,0 +1,10 @@
+# Jetson Orin Nano 주의:
+#  - torch/torchvision은 pip 기본 휠 대신 NVIDIA Jetson용 휠 사용 (README 참고)
+#  - tensorrt는 JetPack에 포함 — pip 설치 불필요
+ultralytics>=8.2
+opencv-python>=4.8
+numpy>=1.24
+pyyaml>=6.0
+fastapi>=0.110
+uvicorn>=0.29
+psutil>=5.9

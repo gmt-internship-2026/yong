@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제스처 키오스크 — 예시 UI</title>
+<style>
+  :root {
+    --bg: #10141c; --panel: #1a2230; --panel2: #202b3d; --line: #2e3d55;
+    --text: #e8eef7; --dim: #8ea0bb; --accent: #35c46f; --warn: #f0a437; --danger: #e05555;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
+  .banner { background: var(--warn); color: #1a1a1a; text-align: center; font-weight: 700; padding: 6px; font-size: 13px; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 14px 22px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 18px; }
+  header .stats { display: flex; gap: 16px; font-size: 13px; color: var(--dim); }
+  header .stats b { color: var(--accent); }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 22px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .panel h2 { font-size: 14px; color: var(--dim); margin-bottom: 10px; }
+  #cam { width: 100%; border-radius: 8px; background: #000; min-height: 300px; }
+  .guide { margin-top: 10px; font-size: 12px; color: var(--dim); line-height: 1.7; }
+  .guide span { display: inline-block; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 8px; margin-right: 6px; }
+  .page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .page-head .title { font-size: 16px; font-weight: 700; }
+  .page-head .num { color: var(--dim); font-size: 13px; }
+  .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .item { background: var(--panel2); border: 2px solid var(--line); border-radius: 10px; padding: 16px 12px; text-align: center; transition: 0.15s; }
+  .item .price { color: var(--dim); font-size: 13px; margin-top: 4px; }
+  .item.hl { border-color: var(--accent); box-shadow: 0 0 12px rgba(53,196,111,0.25); }
+  .cart { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px; font-size: 13px; }
+  .cart .sum { color: var(--accent); font-weight: 700; }
+  #evlog { list-style: none; font-size: 12px; color: var(--dim); max-height: 150px; overflow-y: auto; }
+  #evlog li { padding: 3px 0; border-bottom: 1px solid var(--panel2); }
+  #evlog b { color: var(--text); }
+  #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); align-items: center; justify-content: center; }
+  #modal .box { background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 28px 36px; text-align: center; }
+  #modal .box h3 { margin-bottom: 10px; }
+  #modal .box p { color: var(--dim); font-size: 13px; line-height: 1.8; }
+  #toast { display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+           background: var(--accent); color: #10141c; font-weight: 700; padding: 10px 26px; border-radius: 30px; }
+</style>
+</head>
+<body>
+<div class="banner">⚠ 예시 UI — 회사 키오스크 프로그램으로 교체 예정 (연동 규격: 기획서 9장 №7 협의 대기)</div>
+<header>
+  <h1>광명테크 배리어프리 키오스크 <small style="color:var(--dim);font-size:12px;">제스처 인식 데모</small></h1>
+  <div class="stats">
+    <span>추론 <b id="s-infer">-</b> FPS</span>
+    <span>카메라 <b id="s-cap">-</b> FPS</span>
+    <span>CPU <b id="s-cpu">-</b>%</span>
+    <span>MEM <b id="s-mem">-</b>%</span>
+  </div>
+</header>
+<main>
+  <section class="panel">
+    <h2>실시간 인식 화면 (CAM)</h2>
+    <img id="cam" src="/video_feed" alt="camera stream">
+    <div class="guide">
+      <span>👉 point</span>항목 선택 &nbsp;
+      <span>✋ palm_stop</span>취소/뒤로 &nbsp;
+      <span>👋 swipe</span>페이지 이동 &nbsp;
+      <span>👍 thumbs_up</span>확인/결제
+    </div>
+  </section>
+  <section class="panel">
+    <div class="page-head">
+      <div class="title" id="page-title">메뉴</div>
+      <div class="num" id="page-num">1 / 3</div>
+    </div>
+    <div class="menu" id="menu"></div>
+    <div class="cart">🛒 장바구니: <span id="cart-list">비어 있음</span> &nbsp; <span class="sum" id="cart-sum"></span></div>
+    <div style="margin-top:14px;">
+      <h2>이벤트 로그</h2>
+      <ul id="evlog"></ul>
+    </div>
+  </section>
+</main>
+<div id="modal"><div class="box">
+  <h3>결제 확인</h3>
+  <p id="modal-body"></p>
+  <p style="margin-top:8px;">👍 thumbs_up = 결제 &nbsp;|&nbsp; ✋ palm_stop = 취소</p>
+</div></div>
+<div id="toast"></div>
+
+<script>
+const PAGES = [
+  { title: "커피", items: [["아메리카노",3000],["카페라떼",3800],["바닐라라떼",4200],["콜드브루",4000]] },
+  { title: "음료", items: [["딸기주스",4500],["레모네이드",4300],["아이스티",3500],["미네랄워터",1500]] },
+  { title: "디저트", items: [["치즈케이크",5500],["크루아상",3800],["마카롱",2500],["브라우니",4000]] },
+];
+let pageIdx = 0, hlIdx = 0, cart = [], modalOpen = false, lastEventTs = 0;
+
+function renderMenu() {
+  const page = PAGES[pageIdx];
+  document.getElementById("page-title").textContent = page.title;
+  document.getElementById("page-num").textContent = `${pageIdx + 1} / ${PAGES.length}`;
+  document.getElementById("menu").innerHTML = page.items.map(([name, price], i) =>
+    `<div class="item ${i === hlIdx ? "hl" : ""}"><div>${name}</div><div class="price">${price.toLocaleString()}원</div></div>`
+  ).join("");
+  const sum = cart.reduce((a, c) => a + c[1], 0);
+  document.getElementById("cart-list").textContent = cart.length ? cart.map(c => c[0]).join(", ") : "비어 있음";
+  document.getElementById("cart-sum").textContent = cart.length ? `합계 ${sum.toLocaleString()}원` : "";
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.display = "block";
+  setTimeout(() => { t.style.display = "none"; }, 1800);
+}
+
+function applyGesture(name) {
+  const modal = document.getElementById("modal");
+  if (modalOpen) {
+    if (name === "thumbs_up") {
+      modal.style.display = "none"; modalOpen = false;
+      showToast("✅ 결제가 완료되었습니다"); cart = []; renderMenu();
+    } else if (name === "palm_stop") {
+      modal.style.display = "none"; modalOpen = false; showToast("결제를 취소했습니다");
+    }
+    return;
+  }
+  const items = PAGES[pageIdx].items;
+  if (name === "swipe_left")  { pageIdx = (pageIdx - 1 + PAGES.length) % PAGES.length; hlIdx = 0; }
+  if (name === "swipe_right") { pageIdx = (pageIdx + 1) % PAGES.length; hlIdx = 0; }
+  if (name === "point") {
+    cart.push(items[hlIdx]); showToast(`${items[hlIdx][0]} 담김`);
+    hlIdx = (hlIdx + 1) % items.length;
+  }
+  if (name === "palm_stop" && cart.length) { showToast(`${cart.pop()[0]} 취소됨`); }
+  if (name === "thumbs_up") {
+    if (!cart.length) { showToast("장바구니가 비어 있습니다"); }
+    else {
+      const sum = cart.reduce((a, c) => a + c[1], 0);
+      document.getElementById("modal-body").textContent =
+        `${cart.length}개 항목 · 합계 ${sum.toLocaleString()}원`;
+      modal.style.display = "flex"; modalOpen = true;
+    }
+  }
+  renderMenu();
+}
+
+async function poll() {
+  try {
+    const d = await (await fetch("/data")).json();
+    document.getElementById("s-infer").textContent = d.stats.infer_fps;
+    document.getElementById("s-cap").textContent = d.stats.capture_fps;
+    document.getElementById("s-cpu").textContent = d.stats.cpu;
+    document.getElementById("s-mem").textContent = d.stats.memory;
+    const log = document.getElementById("evlog");
+    log.innerHTML = d.events.slice().reverse().map(e =>
+      `<li><b>${e.class_name}</b> (conf=${e.conf})</li>`).join("");
+    for (const e of d.events) {
+      if (e.ts_sec > lastEventTs) { lastEventTs = e.ts_sec; applyGesture(e.class_name); }
+    }
+  } catch (err) { /* 서버 재시작 중 폴링 실패는 무시 */ }
+}
+renderMenu();
+setInterval(poll, 300);
+</script>
+</body>
+</html>

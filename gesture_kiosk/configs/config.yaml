@@ -1,0 +1,50 @@
+# gesture_kiosk 설정 — 모든 튜닝값의 단일 출처 (기획서 4.7 : 코드에 숫자 하드코딩 금지)
+
+camera:
+  device_id: 0            # USB 웹캠 장치 번호 (/dev/video0)
+  width_px: 1280
+  height_px: 720
+  mirror: true            # 거울 모드 — 사용자 기준 좌/우와 스와이프 방향을 일치시킨다
+
+model:
+  backend: torch          # torch(.pt, 개발 PC) | engine(.engine, Jetson TensorRT)
+  weights_path: models/weights/YOLOv10n_gestures.pt
+  engine_path: models/engines/gesture_fp16.engine
+  input_size_px: 640
+  class_map:              # 모델 출력 class_name -> 표준 제스처 (기획서 5.1). 미등록 클래스는 무시된다
+    point: point
+    one: point
+    palm: palm_stop
+    stop: palm_stop
+    stop_inverted: palm_stop
+    like: thumbs_up
+
+detect:
+  conf_threshold: 0.5
+  stable_frame_count: 5       # 같은 제스처 N프레임 연속 검출 시 이벤트 확정 (기획서 3.2)
+  cooldown_sec: 1.0           # 이벤트 확정 직후 입력 무시 시간 — 연타 방지
+  max_static_move_ratio: 0.08 # 정적 제스처로 인정하는 최대 이동량 (프레임 폭 대비 비율)
+  swipe:
+    source_gesture: palm_stop # 이 제스처(손바닥)의 궤적으로 스와이프를 판정한다
+    window_sec: 0.7           # 이 시간 안에
+    min_dist_ratio: 0.35      # 프레임 폭의 이 비율 이상 이동하면 스와이프 확정
+
+classes: [point, palm_stop, swipe_left, swipe_right, thumbs_up]   # 기획서 5.1과 일치
+
+event_output:
+  # TODO(기획서 9장 №7): 회사 키오스크 프로그램의 이벤트 수신 규격(소켓/시리얼/공유메모리)
+  #                      확정 후 mode 추가 및 event_sender.py 구현 교체
+  mode: console           # console | udp
+  udp:
+    host: 127.0.0.1
+    port: 9999
+
+demo_ui:                  # 예시 UI 서버 — 회사 프로그램 인수 후 제거 예정
+  host: 0.0.0.0
+  port: 5000
+  stream_fps: 15
+  jpeg_quality: 75
+
+logging:
+  level: INFO
+  save_dir: logs/
