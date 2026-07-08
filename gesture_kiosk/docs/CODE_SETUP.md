@@ -1,5 +1,12 @@
 # 개발 PC 셋업 가이드 (VS Code — 빈 환경 기준)
 
+> ## ⛔ 젯슨에서는 이 문서를 따라 하지 말 것
+> 지금 터미널에서 `uname -m` 결과가 **aarch64**(= Jetson)라면 이 문서를 덮고
+> **[JETSON_SETUP.md](JETSON_SETUP.md)** 로 갈 것. 이 문서대로 설치하면 GPU를 못 쓰는
+> torch가 깔린다 ("driver too old" 오류의 원인).
+> 이 문서는 **개발용 보조 PC**(맥/윈도우/x86 리눅스)에서 코드를 고치고 빠르게
+> 확인하고 싶을 때만 쓰는 선택 사항이다. 젯슨만 쓴다면 이 문서는 아예 필요 없다.
+
 작성: 2026-07-08. 맥(Apple Silicon)·윈도우·리눅스(우분투 x86) 공통, OS별 차이는 각 단계에 표기.
 **Jetson 보드는 같은 리눅스라도 전용 PyTorch 휠이 필요해 절차가 다르다 — [JETSON_SETUP.md](JETSON_SETUP.md)를 볼 것.**
 
@@ -64,7 +71,8 @@ python -m unittest discover tests -v
 # ② 모델 가중치 다운로드 (22MB)
 python scripts/download_weights.py
 
-# ③ 실시간 데모 — 맥 내장 카메라(device_id: 0)로 바로 동작
+# ③ 실시간 데모 — 개발 PC에서는 내장/USB 카메라가 USB 웹캠의 대역을 한다
+#    (실전 구성은 어디까지나 Jetson + USB 웹캠. 여기서는 코드 확인용일 뿐)
 python scripts/run_demo.py
 #   브라우저에서 http://localhost:5000 접속
 #   macOS가 카메라 권한을 물으면 "허용"
