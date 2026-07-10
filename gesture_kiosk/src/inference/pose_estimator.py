@@ -1,8 +1,11 @@
-"""inference 모듈 — 사람 포즈(YOLO pose)를 추론해 얼굴·손목 키포인트를 얻는다.
+"""inference 모듈 — 사람 포즈(RTMPose)를 추론해 얼굴·손목 키포인트를 얻는다.
 
-사용자 잠금(person_lock)의 입력을 만든다: 프레임 안의 모든 사람에 대해
-머리(코·눈·귀)와 손목(왼/오른) 키포인트를 돌려준다. 제스처 검출기(trt_engine)와
-같은 backend 규칙(torch .pt / TensorRT .engine)을 따른다.
+2026-07-11 교체(라이선스 B안): ultralytics yolo11n-pose(AGPL-3.0)를 제거하고
+rtmlib(Apache-2.0, RTMPose 계열 + ONNX Runtime)로 바꿨다. 출력 규격은 동일한
+COCO 17 키포인트라 사용자 잠금(person_lock)은 수정 없이 그대로 동작한다.
+
+모델 파일은 첫 실행 때 자동으로 내려받아 캐시(~/.cache/rtmlib)에 둔다 —
+내부망 반입 시에는 make_offline_bundle.bat이 이 캐시를 함께 담는다.
 
 키포인트 번호는 COCO 17 규격이다 (0=코, 1·2=눈, 3·4=귀, 9=왼손목, 10=오른손목).
 주의: 이 라벨은 "화면에 보이는 사람" 기준의 해부학적 좌/우다. 거울 반전된
@@ -11,26 +14,25 @@
 from dataclasses import dataclass, field
 
 import numpy as np
-from ultralytics import YOLO
 
 from src.utils.logger import get_logger
 
 logger = get_logger("inference")
 
-WARMUP_SIZE_PX = 640
-
-# COCO 17 키포인트 인덱스 (ultralytics pose 출력 순서)
+# COCO 17 키포인트 인덱스 (RTMPose body 계열 출력 순서)
 KPT_NOSE = 0
 KPT_HEAD_INDICES = (0, 1, 2, 3, 4)  # 코·양눈·양귀 — 얼굴 영역 추정에 사용
 KPT_LEFT_WRIST = 9
 KPT_RIGHT_WRIST = 10
+
+BBOX_PAD_RATIO = 0.10  # 키포인트 묶음 -> 사람 박스로 넓히는 패딩 (추적용)
 
 
 @dataclass
 class PersonPose:
     """사람 1명의 포즈 추정 결과 (기획서 4.6 공통 데이터 구조 스타일)."""
 
-    bbox: tuple                 # (x1, y1, x2, y2) 픽셀 좌표
+    bbox: tuple                 # (x1, y1, x2, y2) 픽셀 좌표 — 키포인트 묶음 기반
     conf: float
     keypoints: np.ndarray       # shape (17, 3) — (x_px, y_px, conf)
     head_points: list = field(default_factory=list)  # 신뢰도 통과한 머리 키포인트 [(x, y)]
@@ -43,63 +45,61 @@ class PersonPose:
         return float(x), float(y)
 
 
-def _resolve_device(backend):
-    # .engine은 GPU 전용. torch 백엔드는 CUDA(윈도우/리눅스) → MPS(맥) → CPU 순 자동 선택
-    if backend == "engine":
-        return 0
-    import torch
+def _resolve_device(device):
+    """auto -> onnxruntime에 CUDA가 있으면 cuda, 없으면 cpu."""
+    if device != "auto":
+        return device
+    import onnxruntime as ort
 
-    if torch.cuda.is_available():
-        return 0
-    if torch.backends.mps.is_available():
-        return "mps"
-    return "cpu"
+    return "cuda" if "CUDAExecutionProvider" in ort.get_available_providers() else "cpu"
+
+
+def _bbox_from_keypoints(keypoints, kpt_conf, frame_shape):
+    """신뢰도 통과 키포인트를 감싸는 박스. 통과점이 없으면 None."""
+    valid = keypoints[keypoints[:, 2] >= kpt_conf]
+    if len(valid) == 0:
+        return None
+    x1, y1 = valid[:, 0].min(), valid[:, 1].min()
+    x2, y2 = valid[:, 0].max(), valid[:, 1].max()
+    pad = max(x2 - x1, y2 - y1, 20.0) * BBOX_PAD_RATIO
+    h_px, w_px = frame_shape[:2]
+    return (
+        max(0.0, float(x1 - pad)), max(0.0, float(y1 - pad)),
+        min(w_px - 1.0, float(x2 + pad)), min(h_px - 1.0, float(y2 + pad)),
+    )
 
 
 class PoseEstimator:
-    """YOLO pose 추정기. infer(frame) -> list[PersonPose]."""
+    """RTMPose 포즈 추정기. infer(frame) -> list[PersonPose]."""
 
     def __init__(self, config):
-        backend = config["model"]["backend"]
-        if backend == "engine":
-            model_path = config["model"]["pose_engine_path"]
-        else:
-            model_path = config["model"]["pose_weights_path"]
+        from rtmlib import Body  # 무거운 의존 — person_lock을 끈 환경에선 임포트하지 않는다
 
-        self._model = YOLO(model_path, task="pose")
-        self._device = _resolve_device(backend)
-        self._input_size_px = config["model"]["input_size_px"]
+        model = config["model"]
+        device = _resolve_device(model["device"])
         self._kpt_conf_threshold = config["person_lock"]["kpt_conf_threshold"]
-
-        dummy = np.zeros((WARMUP_SIZE_PX, WARMUP_SIZE_PX, 3), dtype=np.uint8)
-        self._model.predict(dummy, verbose=False, device=self._device)
-        logger.info("포즈 모델 로딩 완료: %s (backend=%s, device=%s)", model_path, backend, self._device)
+        # mode: lightweight(빠름) | balanced(기본) | performance(정확) — 첫 실행 시 자동 다운로드
+        self._body = Body(mode=model["pose_mode"], backend="onnxruntime", device=device)
+        logger.info("포즈 모델 로딩 완료: rtmlib Body(mode=%s, device=%s)", model["pose_mode"], device)
 
     def infer(self, frame):
         """프레임에서 사람 포즈를 추정한다."""
-        results = self._model.predict(
-            frame,
-            imgsz=self._input_size_px,
-            verbose=False,
-            device=self._device,
-        )
+        keypoints_xy, scores = self._body(frame)  # (N,17,2), (N,17)
         persons = []
-        result = results[0]
-        if result.keypoints is None or result.boxes is None:
-            return persons
-
-        for box, kpts in zip(result.boxes, result.keypoints):
-            keypoints = kpts.data[0].cpu().numpy()  # (17, 3)
+        for xy, score in zip(keypoints_xy, scores):
+            keypoints = np.concatenate([xy, score[:, None]], axis=1).astype(np.float32)
+            bbox = _bbox_from_keypoints(keypoints, self._kpt_conf_threshold, frame.shape)
+            if bbox is None:
+                continue
             head_points = [
                 (float(keypoints[i][0]), float(keypoints[i][1]))
                 for i in KPT_HEAD_INDICES
                 if keypoints[i][2] >= self._kpt_conf_threshold
             ]
-            x1, y1, x2, y2 = (float(v) for v in box.xyxy[0])
             persons.append(
                 PersonPose(
-                    bbox=(x1, y1, x2, y2),
-                    conf=float(box.conf),
+                    bbox=bbox,
+                    conf=float(score.mean()),
                     keypoints=keypoints,
                     head_points=head_points,
                 )

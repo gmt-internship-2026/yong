@@ -2,6 +2,10 @@
 
 작성: 2026-07-08. JetPack 6.x (Ubuntu 22.04 / Python 3.10 / CUDA 12.x) 기준.
 
+> ⚠ 2026-07-11 라이선스 B안 이후 실행기가 ONNX Runtime으로 바뀌어 이 문서의
+> torch 중심 절차·build_engine 단계는 **구버전 기록**이다. Jetson 시험은
+> feat/test_think/jetson 브랜치의 setup_jetson.sh·시험가이드.md를 따를 것.
+
 > ✅ **젯슨 오린 나노에서는 이 문서가 유일한 정답이다.** docs/CODE_SETUP.md(개발 PC용)를
 > 젯슨에서 따라 하면 GPU를 못 쓰는 torch가 설치된다 — 반드시 이 문서의 3단계 순서대로.
 

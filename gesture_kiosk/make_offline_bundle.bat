@@ -24,20 +24,18 @@ if not exist venv_bundle ( %PY_CMD% -m venv venv_bundle || exit /b 1 )
 call venv_bundle\Scripts\activate.bat
 python -m pip install --upgrade pip >nul
 
-echo [INFO] torch (CUDA 12.8) 휠 다운로드...
+echo [INFO] torch (CUDA 12.8 — EasyOCR용) 휠 다운로드...
 pip download torch==2.11.0+cu128 torchvision==0.26.0+cu128 ^
     --index-url https://download.pytorch.org/whl/cu128 -d wheelhouse || exit /b 1
-echo [INFO] requirements 휠 다운로드...
+echo [INFO] requirements 휠 다운로드 (onnxruntime-gpu·rtmlib 포함)...
 pip download -r requirements.txt -d wheelhouse || exit /b 1
-echo [INFO] tensorrt 휠 다운로드 (엔진 백엔드용 — 선택이지만 같이 담는다)...
-pip download tensorrt -d wheelhouse
 echo [INFO] pip 자체도 담는다 (구버전 pip 대비)
 pip download pip -d wheelhouse
 
-REM ---- 2) 모델 가중치 수집 ------------------------------------
+REM ---- 2) 포즈(rtmlib) 모델 캐시 수집 --------------------------
 pip install --no-index --find-links wheelhouse -r requirements.txt >nul 2>&1 || pip install -r requirements.txt >nul
 python scripts\download_weights.py || exit /b 1
-xcopy /y /q models\weights bundle_models\weights\ >nul
+xcopy /y /q /e "%USERPROFILE%\.cache\rtmlib" bundle_models\rtmlib\ >nul
 
 REM ---- 3) EasyOCR 한국어 모델 수집 ----------------------------
 echo [INFO] EasyOCR 모델 1회 다운로드 (수 분)...

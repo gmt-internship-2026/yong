@@ -12,11 +12,11 @@ camera:
   windows_backend: dshow  # 윈도우 캡처 백엔드: dshow(권장, 빠른 오픈) | msmf | auto
 
 model:
-  backend: torch          # torch(.pt — 설치 직후 기본) | engine(.engine — install.bat TRT 빌드 후)
-  weights_path: models/weights/YOLOv10n_gestures.pt   # HaGRIDv2 제스처 검출기
-  engine_path: models/engines/gesture_fp16.engine
-  pose_weights_path: models/weights/yolo11n-pose.pt   # 사람 포즈(손목 좌/우 라벨) — 사용자 잠금용
-  pose_engine_path: models/engines/pose_fp16.engine
+  # 2026-07-11 라이선스 B안 — 실행기: ONNX Runtime(MIT) / 포즈: rtmlib RTMPose(Apache-2.0)
+  device: auto            # auto(CUDA 있으면 사용) | cuda | cpu
+  use_tensorrt: false     # true면 TensorRT 가속 — 첫 실행 때 이 PC 전용 엔진 캐시 생성 (구 build_engine 대체)
+  gesture_onnx_path: models/weights/YOLOv10n_gestures.onnx   # HaGRIDv2 제스처 (저장소에 포함)
+  pose_mode: balanced     # rtmlib 포즈 크기: lightweight(빠름) | balanced | performance(정확)
   input_size_px: 640
   max_infer_fps: 60       # 추론 루프 FPS 상한 — 초과분은 대기 (GPU 낭비 방지)
   class_map:              # 모델 출력 class_name -> 표준 제스처. 미등록 클래스는 무시된다

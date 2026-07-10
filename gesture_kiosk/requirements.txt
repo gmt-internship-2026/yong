@@ -1,11 +1,14 @@
 # 추론(윈도우 + NVIDIA + Python 3.11.5) 고정 버전 — 타 PC 재현성 보장 (설치가이드.md 참고)
 #
-# torch / torchvision은 CUDA 12.8 휠을 별도 인덱스로 설치해야 해 여기 없다 (install.bat이 처리):
-#   pip install torch==2.11.0+cu128 torchvision==0.26.0+cu128 --index-url https://download.pytorch.org/whl/cu128
-# tensorrt(선택, 엔진 백엔드)도 install.bat /engine 단계에서 설치한다.
+# 2026-07-11 라이선스 B안: ultralytics(AGPL-3.0) 제거 —
+#   실행기 = ONNX Runtime(MIT), 포즈 = rtmlib/RTMPose(Apache-2.0)
 #
-# 개발 맥(Apple Silicon)은 torch/torchvision을 기본 인덱스로 설치하면 된다 (버전 무관 동작).
-ultralytics==8.4.91
+# torch / torchvision은 EasyOCR(주민등록증)용 — CUDA 12.8 휠을 install.bat이 별도 설치:
+#   pip install torch==2.11.0+cu128 torchvision==0.26.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+# (맥/리눅스 개발·시험 환경은 기본 인덱스 torch면 된다)
+onnxruntime-gpu==1.27.0; sys_platform == "win32"    # 배포(윈도우+NVIDIA) — CUDA 실행
+onnxruntime==1.23.2; sys_platform != "win32"        # 맥/리눅스 개발·시험 — CPU 실행
+rtmlib==0.0.15                     # RTMPose 포즈 추정 (Apache-2.0) — 사용자 잠금용
 opencv-python==5.0.0.93
 opencv-python-headless==5.0.0.93   # easyocr 의존성 — opencv-python과 반드시 같은 버전 (cv2 충돌 방지)
 numpy==2.2.6

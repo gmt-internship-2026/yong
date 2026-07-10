@@ -17,3 +17,5 @@ venv_bundle/
 wheelhouse/
 bundle_models/
 .vscode/
+!models/weights/YOLOv10n_gestures.onnx
+models/weights/trt_cache/

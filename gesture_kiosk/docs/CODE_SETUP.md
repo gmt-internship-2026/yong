@@ -54,8 +54,8 @@ source venv/bin/activate        # 맥·리눅스 공통 / 윈도우: venv\Script
 pip install -r requirements.txt
 ```
 
-- ultralytics(YOLO)·opencv(카메라)·fastapi(서버)·pyyaml(설정) 등이 한 번에 설치된다 (약 2GB, 수 분 소요)
-- PyTorch는 ultralytics가 자동으로 끌고 온다. **Apple Silicon 맥은 이 기본 설치만으로
+- onnxruntime(실행기)·rtmlib(포즈)·opencv(카메라)·fastapi(서버)·easyocr 등이 한 번에 설치된다 (수 분 소요)
+- PyTorch는 EasyOCR용으로 함께 설치한다. **Apple Silicon 맥은 이 기본 설치만으로
   MPS(맥 GPU 가속)까지 지원** — 코드가 CUDA → MPS → CPU 순으로 자동 감지한다
 - 윈도우 + NVIDIA GPU라면 GPU 가속용 torch를 별도 설치:
   `pip install torch --index-url https://download.pytorch.org/whl/cu124`

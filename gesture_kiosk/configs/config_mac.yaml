@@ -13,11 +13,11 @@ camera:
   windows_backend: auto   # 맥에서는 무시된다
 
 model:
-  backend: torch          # 개발 PC는 torch(.pt) — CUDA → MPS(맥 GPU) → CPU 자동 감지
-  weights_path: models/weights/YOLOv10n_gestures.pt
-  engine_path: models/engines/gesture_fp16.engine
-  pose_weights_path: models/weights/yolo11n-pose.pt
-  pose_engine_path: models/engines/pose_fp16.engine
+  # 라이선스 B안 — ONNX Runtime(MIT) + rtmlib(Apache-2.0). 맥은 CPU 실행(개발 확인용)
+  device: auto            # 맥: CUDA 없음 -> 자동으로 cpu
+  use_tensorrt: false
+  gesture_onnx_path: models/weights/YOLOv10n_gestures.onnx
+  pose_mode: lightweight  # ★ 맥 CPU — 가벼운 포즈 모델로 개발 확인
   input_size_px: 640
   max_infer_fps: 60
   class_map:

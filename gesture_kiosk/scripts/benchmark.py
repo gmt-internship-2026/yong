@@ -32,7 +32,7 @@ def main():
     config = load_config(args.config)
     init_logging(config)
 
-    from src.inference.trt_engine import GestureDetector
+    from src.inference.detector import GestureDetector
 
     detector = GestureDetector(config)
 

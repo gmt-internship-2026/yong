@@ -36,7 +36,9 @@
 - [ ] **№7 이벤트 전달 규격 합의** — udp JSON 예시 구현 상태. 소켓/시리얼 등 확정 시 Sender 추가
 - [ ] **№8 통합 범위 확정** — UI 통합까지인지 이벤트 출력까지인지
 - [ ] **№5·№6 KPI 측정 기준 합의** — 정확도 85% 산식 / 30 FPS(엔드투엔드 vs 추론 단독)
-- [ ] **№9 라이선스 검토** — HaGRID(CC BY-SA 4.0 변형) + **ultralytics AGPL-3.0(pose 모델)** 상용 탑재 가능 여부
+- [ ] **№9 라이선스 검토** — 2026-07-11 **B안 적용 완료**(AGPL 제거: ONNX Runtime(MIT)+rtmlib(Apache-2.0)).
+      잔여 확인 2건: ① HaGRID 고지문(models/weights/NOTICE_HaGRID.md) 제품 문서 포함 방식
+      ② .pt→ONNX 변환에 ultralytics를 도구로 1회 사용한 것의 해석(일반적으로 무관하나 법무 한 줄 확인)
 - [ ] **№10 코드 저장 위치·백업 정책** — 외부 Git 허용 여부
 - [ ] **№11 (신규) 주민등록번호 처리 법적 근거** — 개인정보보호법 제24조의2.
       민원발급기의 본인확인 목적 처리 근거·보관 정책을 회사/발주처에 확인
@@ -46,8 +48,8 @@
 ## 🟡 윈도우 실기기 검증 (설치 PC 확보 시 — 맥 개발기에서 불가한 항목)
 
 - [ ] install.bat / run.bat / make_offline_bundle.bat 실기 동작 확인 (작성만 됨 — 미검증)
-- [ ] torch 2.11.0+cu128 설치 및 CUDA 인식 (smoke_test)
-- [ ] TensorRT 엔진 빌드(install.bat /engine) 후 backend: engine 전환 → benchmark 30 FPS 기록
+- [ ] torch(EasyOCR용) 2.11.0+cu128 + onnxruntime-gpu 1.27.0 설치, CUDA EP 인식 (smoke_test)
+- [ ] TensorRT 가속(config use_tensorrt: true — 첫 실행 캐시 생성) → benchmark 30 FPS 기록
 - [ ] 오토포커스 카메라로 person_lock 튜닝 (sharpness_weight·wrist_match_ratio)
 - [ ] 실물 주민등록증으로 OCR 정확도 확인 (조명·거리별) → 미달 시 training/ OCR 파인튜닝 가동
 - [ ] 한국어 TTS 보이스(Heami 등) 설치 확인 + 안내 문구 낭독 품질

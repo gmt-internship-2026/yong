@@ -10,8 +10,9 @@ def load_config(config_path):
         config = yaml.safe_load(f)
 
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(config_path)))
-    for path_key in ("weights_path", "engine_path", "pose_weights_path", "pose_engine_path"):
-        config["model"][path_key] = os.path.join(root_dir, config["model"][path_key])
+    config["model"]["gesture_onnx_path"] = os.path.join(
+        root_dir, config["model"]["gesture_onnx_path"]
+    )
     config["logging"]["save_dir"] = os.path.join(root_dir, config["logging"]["save_dir"])
     config["root_dir"] = root_dir
     return config

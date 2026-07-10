@@ -15,9 +15,9 @@ import time
 
 from src.announce.announcer import Announcer
 from src.capture.camera_stream import CameraStream
+from src.inference.detector import GestureDetector
 from src.inference.pose_estimator import PoseEstimator
 from src.inference.preprocessor import Preprocessor
-from src.inference.trt_engine import GestureDetector
 from src.pipeline.event_sender import create_event_sender
 from src.postprocess.gesture_filter import GestureEvent, GestureFilter
 from src.postprocess.person_lock import PersonLock

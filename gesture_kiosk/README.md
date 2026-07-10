@@ -5,7 +5,7 @@
 2.3 디렉터리 구조와 4장 코딩 컨벤션을 따른다.**
 
 - 실행 환경: **윈도우 + NVIDIA GPU + Python 3.11.5** (2026-07-10 타깃 변경 — 정부 민원발급기)
-- 모델: HaGRIDv2 제스처 YOLOv10n + YOLO11n-pose(사용자 잠금) — **학습 0회로 즉시 동작**
+- 모델: HaGRIDv2 제스처(ONNX) + RTMPose 포즈(사용자 잠금) — **학습 0회, AGPL 없는 상용 안전 스택** (2026-07-11 B안)
 - 학습(파인튜닝)은 별도 `training/` 폴더 담당 (feat/study 브랜치) — 이 폴더는 추론 전용
 
 ## 빠른 시작 (윈도우)
@@ -37,7 +37,7 @@ run.bat            :: 실행 — 브라우저 http://localhost:5000
 ## 처리 흐름
 
 ```
-카메라(스레드) → 거울 반전 → 제스처 검출(YOLOv10n) + 사람 포즈(YOLO11n-pose)
+카메라(스레드) → 거울 반전 → 제스처 검출(ONNX Runtime) + 사람 포즈(rtmlib RTMPose)
   → 사용자 잠금(person_lock: 얼굴 선명도×크기) → 손 귀속(왼/오른)
   → 동작 판정(gesture_filter FSM) → 이벤트 전송(event_sender) + 음성 안내(announce)
 주민등록증 OCR(easyocr)은 별도 워커 스레드 — UI가 /ocr/start로 요청할 때만
@@ -49,11 +49,11 @@ run.bat            :: 실행 — 브라우저 http://localhost:5000
 gesture_kiosk/
 ├─ install.bat / run.bat / make_offline_bundle.bat  # 윈도우 이식·실행 (설치가이드.md)
 ├─ configs/config.yaml      # 모든 설정값의 단일 출처 — 튜닝은 여기서만
-├─ models/weights|engines/  # .pt 가중치 / TensorRT .engine(★PC마다 재빌드 — 복사 금지)
+├─ models/weights/          # 제스처 ONNX(포함) + NOTICE_HaGRID.md + trt_cache(★PC 전용 — 복사 금지)
 ├─ src/
 │   ├─ capture/camera_stream.py      # USB 카메라 캡처 스레드 (윈도우 DSHOW 기본)
-│   ├─ inference/trt_engine.py       # 제스처 검출 (.pt / .engine)
-│   ├─ inference/pose_estimator.py   # 사람 포즈 — 손목 좌/우, 얼굴 키포인트
+│   ├─ inference/detector.py         # 제스처 검출 (ONNX Runtime — MIT)
+│   ├─ inference/pose_estimator.py   # 사람 포즈 (rtmlib RTMPose — Apache-2.0)
 │   ├─ postprocess/person_lock.py    # 사용자 잠금 + 손 귀속 (거울 좌/우 보정)
 │   ├─ postprocess/gesture_filter.py # 동작 판정 FSM — 신규 스펙 + 레거시 토글
 │   ├─ ocr/idcard_reader.py          # 주민등록증 이름·주민번호 (마스킹 로그)
@@ -61,8 +61,8 @@ gesture_kiosk/
 │   ├─ pipeline/realtime_loop.py     # 실시간 루프 조립 (멀티스레딩)
 │   ├─ pipeline/event_sender.py      # ★ 회사 프로그램 연동 접점 (console/udp)
 │   └─ pipeline/demo_server.py       # ★ 예시 UI 서버 + /announce·/ocr 계약
-├─ scripts/                 # run_demo · download_weights · build_engine · benchmark · smoke_test
-├─ tests/                   # 단위 테스트 43건 (카메라·모델 없이 실행 가능)
+├─ scripts/                 # run_demo · download_weights · benchmark · smoke_test · export_onnx(개발용)
+├─ tests/                   # 단위 테스트 47건 (카메라·모델 없이 실행 가능)
 ├─ demo_ui/index.html       # ★ 예시 민원발급기 화면 (회사 UI 수령 시 교체)
 └─ docs/TODO.md             # 작업 분해 및 회사 확인 필요 항목
 ```
@@ -76,7 +76,7 @@ gesture_kiosk/
 | `run.bat` / `python scripts/run_demo.py` | 파이프라인 + 예시 UI (시연용) |
 | `run.bat --headless` | 파이프라인만 — 이벤트는 `event_output` 설정대로 전송 |
 | `python scripts/benchmark.py` | 추론 단독 FPS 측정 (기획서 6.1 — KPI 30 FPS) |
-| `python -m unittest discover tests -v` | 판정·잠금·OCR 파싱 단위 테스트 |
+| `python -m unittest discover tests -v` | 판정·잠금·OCR 파싱·좌표 변환 단위 테스트 (47건) |
 
 ## 회사 프로그램(UI) 연동 계약
 
@@ -91,12 +91,14 @@ gesture_kiosk/
 
 - **주민등록번호 처리 법적 근거(개인정보보호법 제24조의2) — 회사 확인 필수** (docs/TODO.md №11).
   엔진은 프레임·인식값을 저장하지 않고 로그는 마스킹한다 (설치가이드.md F절)
-- HaGRID 모델: **CC BY-SA 4.0 변형** / ultralytics(yolo11n-pose): **AGPL-3.0**
-  — 상용 탑재 전 반드시 회사 법무 검토 (기획서 9장 №9)
+- **라이선스 B안 적용(2026-07-11)**: AGPL(ultralytics) 제거 — 실행기 ONNX Runtime(MIT),
+  포즈 rtmlib/RTMPose(Apache-2.0), EasyOCR(Apache-2.0). HaGRID는 자체 라이선스(상업 가능,
+  **저작자 표시 필수** → [models/weights/NOTICE_HaGRID.md](models/weights/NOTICE_HaGRID.md)를
+  제품 문서에 포함). 최종 법무 확인은 기획서 9장 №9
 
 ## 참고 링크
 
 - HaGRID (모델·데이터셋): https://github.com/hukenovs/hagrid
-- ultralytics pose 모델: https://docs.ultralytics.com/tasks/pose/
+- rtmlib (RTMPose, Apache-2.0): https://github.com/Tau-J/rtmlib
 - EasyOCR: https://github.com/JaidedAI/EasyOCR
 - (기록) 구 타깃 Jetson Orin Nano 셋업: docs/JETSON_SETUP.md — 2026-07-10 윈도우로 변경되어 보관용
