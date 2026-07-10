@@ -1,107 +1,102 @@
-# gesture_kiosk — 제스처 인식 배리어프리 키오스크
+# gesture_kiosk — 제스처 인식 배리어프리 민원발급기 (추론)
 
-(주)광명테크 인턴 프로젝트. USB 카메라 1대로 손 제스처 5종을 실시간 인식해
-키오스크 프로그램으로 이벤트를 전달한다. **기획서(고성모_기획서.docx)의
-2.3 디렉터리 구조와 4장 코딩 컨벤션을 그대로 따른다.**
+(주)광명테크 인턴 프로젝트. USB 카메라 1대로 손 제스처와 주민등록증을 실시간
+인식해 키오스크 프로그램으로 이벤트를 전달한다. **기획서(고성모_기획서.docx)의
+2.3 디렉터리 구조와 4장 코딩 컨벤션을 따른다.**
 
-- 기반 코드: 캡스톤 프로젝트(Jetson Orin Nano + FastAPI + YOLO/TensorRT) 구조 이식
-- 실행 보드: **Jetson Orin Nano** (SD카드 128GB — 학습 금지, 추론 전용)
-- 모델: HaGRIDv2 사전학습 YOLOv10n 제스처 검출기 (**학습 0회로 즉시 동작**)
+- 실행 환경: **윈도우 + NVIDIA GPU + Python 3.11.5** (2026-07-10 타깃 변경 — 정부 민원발급기)
+- 모델: HaGRIDv2 제스처 YOLOv10n + YOLO11n-pose(사용자 잠금) — **학습 0회로 즉시 동작**
+- 학습(파인튜닝)은 별도 `training/` 폴더 담당 (feat/study 브랜치) — 이 폴더는 추론 전용
 
-## 인식 제스처 (기획서 5.1)
+## 빠른 시작 (윈도우)
 
-| class_name | 동작 | 키오스크 명령 | 판정 방식 |
+```bat
+install.bat        :: 설치 (인터넷) — 내부망은 설치가이드.md B절
+run.bat            :: 실행 — 브라우저 http://localhost:5000
+```
+
+> 상세 절차·내부망(오프라인) 반입·문제 해결: **[설치가이드.md](설치가이드.md)**
+> 개발 맥에서는 `venv` 활성화 후 `python scripts/run_demo.py` (torch 백엔드 그대로).
+
+## 인식 동작 (2026-07-10 확정 스펙)
+
+| action | 동작 | 판정 방식 | 키오스크 명령 |
 |---|---|---|---|
-| point | 검지로 가리키기 | 항목 선택 | 정적 — N프레임 연속 검출 |
-| palm_stop | 손바닥 정면 | 취소 / 뒤로 | 정적 — N프레임 연속 검출 |
-| swipe_left | 손을 왼쪽으로 쓸기 | 이전 페이지 | 동적 — 손바닥 궤적 |
-| swipe_right | 손을 오른쪽으로 쓸기 | 다음 페이지 | 동적 — 손바닥 궤적 |
-| thumbs_up | 엄지 세우기 | 확인 / 결제 | 정적 — N프레임 연속 검출 |
+| move_left | **왼손** 주먹 쥐었다 펴기 | fist N프레임 → open_within_sec 안 펴짐 | 포커스 왼쪽 1칸 |
+| move_right | **오른손** 주먹 쥐었다 펴기 | 〃 | 포커스 오른쪽 1칸 |
+| select | OK 사인 | N프레임 정적 유지 | 선택·확인 (통일) |
+| go_home | 양 손바닥 | 10초 이상 유지 | 처음 화면으로 |
+| fill_id_fields | 주민등록증 제시 | OCR 모드에서 EasyOCR 판독 | 이름·주민번호 자동 입력 |
 
-정적 3종은 HaGRID 모델 클래스를 `config.yaml`의 `class_map`으로 매핑하고
-(point←point/one, palm_stop←palm/stop, thumbs_up←like),
-스와이프 2종은 손바닥 중심 좌표의 이동 궤적으로 후처리(`gesture_filter.py`)에서 판정한다.
+- 상하 이동 없음 — **줄 끝에서 다음 줄 첫 칸 랩(토크백식 선형 순회)은 UI 책임**
+- 잠긴 사용자(초점 맞은 얼굴 기준)의 손목 근처 손만 인식 — **다른 사람 손 무시**
+- 레거시 동작(point/palm 스와이프/thumbs_up 등 기획서 5.1 초안)은
+  `gestures.legacy.enabled`로 병행 유지 중 — 회사 협의(№1) 후 정리
+- "양 손바닥 유지"를 직원 호출로 쓰려면 `gestures.two_palm.action: help_call`
 
-## 폴더 구조 (기획서 2.3 + 예시 UI)
+## 처리 흐름
+
+```
+카메라(스레드) → 거울 반전 → 제스처 검출(YOLOv10n) + 사람 포즈(YOLO11n-pose)
+  → 사용자 잠금(person_lock: 얼굴 선명도×크기) → 손 귀속(왼/오른)
+  → 동작 판정(gesture_filter FSM) → 이벤트 전송(event_sender) + 음성 안내(announce)
+주민등록증 OCR(easyocr)은 별도 워커 스레드 — UI가 /ocr/start로 요청할 때만
+```
+
+## 폴더 구조 (기획서 2.3 + 신규 모듈)
 
 ```
 gesture_kiosk/
+├─ install.bat / run.bat / make_offline_bundle.bat  # 윈도우 이식·실행 (설치가이드.md)
 ├─ configs/config.yaml      # 모든 설정값의 단일 출처 — 튜닝은 여기서만
-├─ data/                    # raw / labeled / splits (4주차 데이터 수집 후 사용)
-├─ models/weights|engines/  # .pt 가중치 / TensorRT .engine
+├─ models/weights|engines/  # .pt 가중치 / TensorRT .engine(★PC마다 재빌드 — 복사 금지)
 ├─ src/
-│   ├─ capture/camera_stream.py      # USB 카메라 캡처 스레드
-│   ├─ inference/preprocessor.py     # 전처리 (거울 반전)
-│   ├─ inference/trt_engine.py       # 모델 로드·추론 (.pt / .engine)
-│   ├─ postprocess/gesture_filter.py # 연속 프레임 판정·스와이프·쿨다운
+│   ├─ capture/camera_stream.py      # USB 카메라 캡처 스레드 (윈도우 DSHOW 기본)
+│   ├─ inference/trt_engine.py       # 제스처 검출 (.pt / .engine)
+│   ├─ inference/pose_estimator.py   # 사람 포즈 — 손목 좌/우, 얼굴 키포인트
+│   ├─ postprocess/person_lock.py    # 사용자 잠금 + 손 귀속 (거울 좌/우 보정)
+│   ├─ postprocess/gesture_filter.py # 동작 판정 FSM — 신규 스펙 + 레거시 토글
+│   ├─ ocr/idcard_reader.py          # 주민등록증 이름·주민번호 (마스킹 로그)
+│   ├─ announce/announcer.py         # 토크백 TTS (pyttsx3 — SAPI/nsss)
 │   ├─ pipeline/realtime_loop.py     # 실시간 루프 조립 (멀티스레딩)
-│   ├─ pipeline/event_sender.py      # ★ 회사 프로그램 연동 접점 (console/udp 예시)
-│   ├─ pipeline/demo_server.py       # ★ 예시 UI 서버 (회사 프로그램 대체 예정)
-│   └─ utils/                        # logger / metrics / visualize / config_loader
-├─ scripts/                 # run_demo · download_weights · export_onnx · build_engine · benchmark · train
-├─ tests/                   # 단위 테스트 (카메라·모델 없이 실행 가능)
-├─ demo_ui/index.html       # ★ 예시 키오스크 화면 (기획서 구조 외 추가 — 교체 예정)
-└─ docs/TODO.md             # 작업 분해 및 미확정 항목
+│   ├─ pipeline/event_sender.py      # ★ 회사 프로그램 연동 접점 (console/udp)
+│   └─ pipeline/demo_server.py       # ★ 예시 UI 서버 + /announce·/ocr 계약
+├─ scripts/                 # run_demo · download_weights · build_engine · benchmark · smoke_test
+├─ tests/                   # 단위 테스트 43건 (카메라·모델 없이 실행 가능)
+├─ demo_ui/index.html       # ★ 예시 민원발급기 화면 (회사 UI 수령 시 교체)
+└─ docs/TODO.md             # 작업 분해 및 회사 확인 필요 항목
 ```
 
-★ 표시는 **회사 키오스크 프로그램을 받으면 교체/제거되는 부분**이다 (기획서 1.2 제외 범위, 9장 №7·№8).
-
-## Jetson Orin Nano 설치
-
-> 상세 단계별 가이드: **[docs/JETSON_SETUP.md](docs/JETSON_SETUP.md)** (클론 인증·전용 PyTorch 휠·문제 해결 포함)
-> 개발 PC(VS Code) 셋업: **[docs/CODE_SETUP.md](docs/CODE_SETUP.md)**
-
-```bash
-# 1) JetPack 6.x 기준. PyTorch는 NVIDIA 제공 Jetson용 휠 사용
-#    https://developer.nvidia.com/embedded/downloads (README 하단 참고)
-pip install -r requirements.txt
-
-# 2) 사전학습 가중치 다운로드 (약 12MB, 학습 불필요)
-python scripts/download_weights.py
-
-# 3) 동작 확인 (.pt 그대로 — 첫 구동 확인용)
-python scripts/run_demo.py
-#    브라우저: http://<jetson-ip>:5000
-
-# 4) TensorRT FP16 엔진 빌드 (약 5~10분, Jetson에서 1회만)
-python scripts/build_engine.py
-#    이후 configs/config.yaml 에서 model.backend: engine 으로 변경 → 30 FPS 목표
-
-# 5) 추론 단독 FPS 측정 (기획서 6.1)
-python scripts/benchmark.py
-```
-
-개발 PC(macOS/Windows)에서는 `model.backend: torch` 그대로 두면 CPU/GPU로 동작한다.
+★ 표시는 **회사 키오스크 프로그램을 받으면 교체/제거되는 부분** (기획서 1.2, 9장 №7·№8).
 
 ## 실행 모드
 
 | 명령 | 용도 |
 |---|---|
-| `python scripts/run_demo.py` | 파이프라인 + 예시 UI (시연용) |
-| `python scripts/run_demo.py --headless` | 파이프라인만 — 이벤트는 `event_output` 설정대로 전송 (회사 프로그램 연동 시) |
-| `python -m unittest discover tests -v` | 판정 로직 단위 테스트 |
+| `run.bat` / `python scripts/run_demo.py` | 파이프라인 + 예시 UI (시연용) |
+| `run.bat --headless` | 파이프라인만 — 이벤트는 `event_output` 설정대로 전송 |
+| `python scripts/benchmark.py` | 추론 단독 FPS 측정 (기획서 6.1 — KPI 30 FPS) |
+| `python -m unittest discover tests -v` | 판정·잠금·OCR 파싱 단위 테스트 |
 
-## 회사 프로그램(UI) 연동 방법
+## 회사 프로그램(UI) 연동 계약
 
-1. `configs/config.yaml`의 `event_output.mode`를 선택 (현재 console/udp 예시 구현)
-2. UDP 모드: 이벤트가 JSON `{"class_name": "swipe_left", "conf": 0.87, "ts_sec": ...}`으로 전송됨
-3. 회사 규격(소켓/시리얼/공유메모리)이 확정되면 `src/pipeline/event_sender.py`에
-   Sender 클래스 1개를 추가하고 mode로 선택 — 파이프라인 코드는 수정 불필요
-4. 연동 완료 후 `demo_server.py`·`demo_ui/`는 제거
+1. 이벤트(엔진→UI): `event_output.mode`(console/udp) 또는 `/data` 폴링 —
+   JSON `{"class_name": "move_right", "conf": 0.87, "ts_sec": ..., "hand_side": "right"}`
+2. 음성 안내(UI→엔진): `POST /announce {"text": "발급하기 버튼"}` — 포커스 항목을 TTS로
+3. 주민등록증(UI→엔진): `POST /ocr/start` → 성공 시 `fill_id_fields` 이벤트(data에 이름·주민번호)
+4. 새 수신 규격 확정 시 `event_sender.py`에 Sender 1개 추가 — 파이프라인 수정 불필요
+5. 연동 완료 후 `demo_server.py`·`demo_ui/`는 제거
 
-## SD카드 128GB 운영 원칙
+## 개인정보·라이선스 주의
 
-- **학습 금지**: `scripts/train.py`는 Jetson(aarch64)에서 실행을 차단한다. 학습은 개발 PC에서.
-- 데이터셋(`data/raw` 등)은 Jetson에 두지 않는다 — 수집·라벨링은 PC에서.
-- Jetson에 필요한 파일은 코드 + `.engine`(약 10~30MB) 뿐이다.
-
-## 라이선스 주의 (기획서 9장 №9)
-
-HaGRID 데이터셋·모델은 **CC BY-SA 4.0 변형** 라이선스다.
-상용 키오스크 탑재 전 반드시 회사 법무/담당자 검토를 거칠 것.
+- **주민등록번호 처리 법적 근거(개인정보보호법 제24조의2) — 회사 확인 필수** (docs/TODO.md №11).
+  엔진은 프레임·인식값을 저장하지 않고 로그는 마스킹한다 (설치가이드.md F절)
+- HaGRID 모델: **CC BY-SA 4.0 변형** / ultralytics(yolo11n-pose): **AGPL-3.0**
+  — 상용 탑재 전 반드시 회사 법무 검토 (기획서 9장 №9)
 
 ## 참고 링크
 
 - HaGRID (모델·데이터셋): https://github.com/hukenovs/hagrid
-- 기반 캡스톤 코드: https://github.com/kakabab12/My_project (2026 1학기 젯슨나노 객체인식 분류+르로봇)
-- Jetson용 PyTorch 휠: https://forums.developer.nvidia.com/t/pytorch-for-jetson
+- ultralytics pose 모델: https://docs.ultralytics.com/tasks/pose/
+- EasyOCR: https://github.com/JaidedAI/EasyOCR
+- (기록) 구 타깃 Jetson Orin Nano 셋업: docs/JETSON_SETUP.md — 2026-07-10 윈도우로 변경되어 보관용

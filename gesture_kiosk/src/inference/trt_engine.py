@@ -1,8 +1,9 @@
 """inference 모듈 — 모델을 로드하고 제스처를 검출한다 (기획서 2.2).
 
-backend 설정에 따라 .pt(개발 PC) 또는 TensorRT .engine(Jetson)을 로드한다.
-두 형식 모두 ultralytics YOLO 러너로 실행한다 — .engine 경로는 캡스톤
-프로젝트(jetson_USB2.py)에서 Jetson Orin Nano 실기기 검증이 끝난 방식이다.
+backend 설정에 따라 .pt(torch — 설치 직후 기본) 또는 TensorRT .engine을 로드한다.
+두 형식 모두 ultralytics YOLO 러너로 실행한다. 타깃(윈도우+NVIDIA)에서는
+install.bat이 TRT 엔진 빌드를 안내한다 — .engine은 GPU 기종·드라이버별로
+달라 절대 복사·이식하지 않고 그 PC에서 빌드한다 (설치가이드.md 참고).
 """
 from dataclasses import dataclass
 
@@ -27,7 +28,7 @@ class Detection:
 
 
 def _resolve_device(backend):
-    # .engine은 GPU 전용. torch 백엔드는 CUDA(Jetson) → MPS(맥 GPU) → CPU 순으로 자동 선택
+    # .engine은 GPU 전용. torch 백엔드는 CUDA(윈도우/리눅스) → MPS(맥 GPU) → CPU 순으로 자동 선택
     if backend == "engine":
         return 0
     import torch

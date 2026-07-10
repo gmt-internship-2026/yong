@@ -20,9 +20,17 @@ FIRST_FRAME_TIMEOUT_SEC = 5.0
 def init_camera(config):
     """config 기준으로 카메라 장치를 열어 cv2.VideoCapture를 돌려준다."""
     device_id = config["camera"]["device_id"]
-    # Jetson(Linux)에서는 V4L2 백엔드가 안정적이다. macOS/Windows는 기본 백엔드 사용
+    # 리눅스는 V4L2가 안정적. 윈도우는 MSMF가 열리는 데 수십 초 걸리는 장치가 있어
+    # 기본을 DSHOW로 두고 config(camera.windows_backend)로 바꿀 수 있게 한다
     if sys.platform.startswith("linux"):
         cap = cv2.VideoCapture(device_id, cv2.CAP_V4L2)
+    elif sys.platform.startswith("win"):
+        backend_name = config["camera"].get("windows_backend", "auto")
+        windows_backends = {"dshow": cv2.CAP_DSHOW, "msmf": cv2.CAP_MSMF}
+        if backend_name in windows_backends:
+            cap = cv2.VideoCapture(device_id, windows_backends[backend_name])
+        else:
+            cap = cv2.VideoCapture(device_id)
     else:
         cap = cv2.VideoCapture(device_id)
     if not cap.isOpened():

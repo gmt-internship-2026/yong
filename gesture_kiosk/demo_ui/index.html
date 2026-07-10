@@ -3,54 +3,64 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>제스처 키오스크 — 예시 UI</title>
+<title>제스처 민원발급기 — 예시 UI</title>
 <style>
   :root {
     --bg: #10141c; --panel: #1a2230; --panel2: #202b3d; --line: #2e3d55;
     --text: #e8eef7; --dim: #8ea0bb; --accent: #35c46f; --warn: #f0a437; --danger: #e05555;
+    --focus: #4da3ff;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: var(--bg); color: var(--text); font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
   .banner { background: var(--warn); color: #1a1a1a; text-align: center; font-weight: 700; padding: 6px; font-size: 13px; }
   header { display: flex; justify-content: space-between; align-items: center; padding: 14px 22px; border-bottom: 1px solid var(--line); }
   header h1 { font-size: 18px; }
-  header .stats { display: flex; gap: 16px; font-size: 13px; color: var(--dim); }
+  header .stats { display: flex; gap: 14px; font-size: 13px; color: var(--dim); }
   header .stats b { color: var(--accent); }
+  .badge { display: inline-block; border-radius: 20px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+  .badge.on { background: var(--accent); color: #10141c; }
+  .badge.off { background: var(--panel2); color: var(--dim); }
   main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 22px; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
   .panel h2 { font-size: 14px; color: var(--dim); margin-bottom: 10px; }
   #cam { width: 100%; border-radius: 8px; background: #000; min-height: 300px; }
-  .guide { margin-top: 10px; font-size: 12px; color: var(--dim); line-height: 1.7; }
+  .guide { margin-top: 10px; font-size: 12px; color: var(--dim); line-height: 1.9; }
   .guide span { display: inline-block; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 8px; margin-right: 6px; }
-  .page-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .page-head .title { font-size: 16px; font-weight: 700; }
-  .page-head .num { color: var(--dim); font-size: 13px; }
-  .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .item { background: var(--panel2); border: 2px solid var(--line); border-radius: 10px; padding: 16px 12px; text-align: center; transition: 0.15s; }
-  .item .price { color: var(--dim); font-size: 13px; margin-top: 4px; }
-  .item.hl { border-color: var(--accent); box-shadow: 0 0 12px rgba(53,196,111,0.25); }
-  .cart { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px; font-size: 13px; }
-  .cart .sum { color: var(--accent); font-weight: 700; }
-  #evlog { list-style: none; font-size: 12px; color: var(--dim); max-height: 150px; overflow-y: auto; }
+  .holdwrap { margin-top: 8px; height: 10px; background: var(--panel2); border-radius: 6px; overflow: hidden; display: none; }
+  .holdbar { height: 100%; width: 0%; background: var(--warn); transition: width 0.2s; }
+  .screen-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .screen-head .title { font-size: 17px; font-weight: 700; }
+  .screen-head .hint { color: var(--dim); font-size: 12px; }
+  .menu { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .item { background: var(--panel2); border: 2px solid var(--line); border-radius: 10px; padding: 22px 10px; text-align: center; font-size: 14px; transition: 0.15s; }
+  .item.hl { border-color: var(--focus); box-shadow: 0 0 12px rgba(77,163,255,0.35); }
+  .idform { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+  .idform label { font-size: 13px; color: var(--dim); }
+  .idform .field { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; font-size: 16px; letter-spacing: 1px; min-height: 44px; }
+  .idform .field.filled { border-color: var(--accent); }
+  .scan-note { font-size: 13px; color: var(--warn); line-height: 1.7; margin-bottom: 14px; }
+  .btnrow { display: flex; gap: 10px; }
+  .btn { flex: 1; background: var(--panel2); border: 2px solid var(--line); border-radius: 10px; padding: 16px; text-align: center; font-weight: 700; }
+  .btn.hl { border-color: var(--focus); box-shadow: 0 0 12px rgba(77,163,255,0.35); }
+  .done { text-align: center; padding: 40px 0; }
+  .done .big { font-size: 22px; font-weight: 700; color: var(--accent); margin-bottom: 10px; }
+  .done p { color: var(--dim); font-size: 13px; line-height: 1.8; }
+  #evlog { list-style: none; font-size: 12px; color: var(--dim); max-height: 130px; overflow-y: auto; }
   #evlog li { padding: 3px 0; border-bottom: 1px solid var(--panel2); }
   #evlog b { color: var(--text); }
-  #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); align-items: center; justify-content: center; }
-  #modal .box { background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 28px 36px; text-align: center; }
-  #modal .box h3 { margin-bottom: 10px; }
-  #modal .box p { color: var(--dim); font-size: 13px; line-height: 1.8; }
   #toast { display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
            background: var(--accent); color: #10141c; font-weight: 700; padding: 10px 26px; border-radius: 30px; }
 </style>
 </head>
 <body>
-<div class="banner">⚠ 예시 UI — 회사 키오스크 프로그램으로 교체 예정 (연동 규격: 기획서 9장 №7 협의 대기)</div>
+<div class="banner">⚠ 예시 UI — 회사 키오스크 프로그램으로 교체 예정 (연동 계약: /data 이벤트 · POST /announce · POST /ocr/start)</div>
 <header>
-  <h1>광명테크 배리어프리 키오스크 <small style="color:var(--dim);font-size:12px;">제스처 인식 데모</small></h1>
+  <h1>배리어프리 민원발급기 <small style="color:var(--dim);font-size:12px;">제스처 인식 데모</small></h1>
   <div class="stats">
+    <span id="b-lock" class="badge off">사용자 인식 대기</span>
+    <span id="b-ocr" class="badge off">신분증 스캔</span>
     <span>추론 <b id="s-infer">-</b> FPS</span>
     <span>카메라 <b id="s-cap">-</b> FPS</span>
-    <span>CPU <b id="s-cpu">-</b>%</span>
-    <span>MEM <b id="s-mem">-</b>%</span>
   </div>
 </header>
 <main>
@@ -58,106 +68,166 @@
     <h2>실시간 인식 화면 (CAM)</h2>
     <img id="cam" src="/video_feed" alt="camera stream">
     <div class="guide">
-      <span>👉 point</span>항목 선택 &nbsp;
-      <span>✋ palm_stop</span>취소/뒤로 &nbsp;
-      <span>👋 swipe</span>페이지 이동 &nbsp;
-      <span>👍 thumbs_up</span>확인/결제
+      <span>✊→✋ 왼손</span>왼쪽 이동 &nbsp; <span>✊→✋ 오른손</span>오른쪽 이동<br>
+      <span>👌 OK</span>선택·확인 &nbsp; <span>🙌 양 손바닥 10초</span>처음으로
     </div>
-  </section>
-  <section class="panel">
-    <div class="page-head">
-      <div class="title" id="page-title">메뉴</div>
-      <div class="num" id="page-num">1 / 3</div>
-    </div>
-    <div class="menu" id="menu"></div>
-    <div class="cart">🛒 장바구니: <span id="cart-list">비어 있음</span> &nbsp; <span class="sum" id="cart-sum"></span></div>
-    <div style="margin-top:14px;">
+    <div class="holdwrap" id="holdwrap"><div class="holdbar" id="holdbar"></div></div>
+    <div style="margin-top:12px;">
       <h2>이벤트 로그</h2>
       <ul id="evlog"></ul>
     </div>
   </section>
+  <section class="panel" id="screen"></section>
 </main>
-<div id="modal"><div class="box">
-  <h3>결제 확인</h3>
-  <p id="modal-body"></p>
-  <p style="margin-top:8px;">👍 thumbs_up = 결제 &nbsp;|&nbsp; ✋ palm_stop = 취소</p>
-</div></div>
 <div id="toast"></div>
 
 <script>
-const PAGES = [
-  { title: "커피", items: [["아메리카노",3000],["카페라떼",3800],["바닐라라떼",4200],["콜드브루",4000]] },
-  { title: "음료", items: [["딸기주스",4500],["레모네이드",4300],["아이스티",3500],["미네랄워터",1500]] },
-  { title: "디저트", items: [["치즈케이크",5500],["크루아상",3800],["마카롱",2500],["브라우니",4000]] },
-];
-let pageIdx = 0, hlIdx = 0, cart = [], modalOpen = false, lastEventTs = 0;
+// ── 민원발급기 예시 화면 3단계: 증명서 선택 → 본인확인(주민등록증) → 발급 완료 ──
+const CERTS = ["주민등록표 등본", "주민등록표 초본", "가족관계증명서",
+               "건축물대장", "토지(임야)대장", "지방세 납세증명"];
+const CONFIRM_BUTTONS = ["발급하기", "취소"];
 
-function renderMenu() {
-  const page = PAGES[pageIdx];
-  document.getElementById("page-title").textContent = page.title;
-  document.getElementById("page-num").textContent = `${pageIdx + 1} / ${PAGES.length}`;
-  document.getElementById("menu").innerHTML = page.items.map(([name, price], i) =>
-    `<div class="item ${i === hlIdx ? "hl" : ""}"><div>${name}</div><div class="price">${price.toLocaleString()}원</div></div>`
-  ).join("");
-  const sum = cart.reduce((a, c) => a + c[1], 0);
-  document.getElementById("cart-list").textContent = cart.length ? cart.map(c => c[0]).join(", ") : "비어 있음";
-  document.getElementById("cart-sum").textContent = cart.length ? `합계 ${sum.toLocaleString()}원` : "";
+let screen = "home";        // home | confirm | done
+let focusIdx = 0;           // 현재 화면의 선형 포커스 위치 (줄 끝 랩은 인덱스 순회로 자동)
+let chosenCert = null;
+let idFields = null;        // fill_id_fields 수신 결과 {name, rrn}
+let lastEventTs = 0;
+let wasOcrMode = false;
+
+const $ = (id) => document.getElementById(id);
+
+function maskName(name) {
+  if (name.length <= 1) return "*";
+  if (name.length === 2) return name[0] + "*";
+  return name[0] + "*".repeat(name.length - 2) + name[name.length - 1];
+}
+function maskRrn(rrn) {  // "950101-1234567" -> "950101-1******"
+  const [front, back] = rrn.split("-");
+  return `${front}-${back[0]}******`;
+}
+
+function focusLabels() {
+  if (screen === "home") return CERTS;
+  if (screen === "confirm") return CONFIRM_BUTTONS;
+  return ["처음으로"];
+}
+
+async function announce(text) {  // 화면 맥락 안내는 UI가 요청한다 (연동 계약 시연)
+  try {
+    await fetch("/announce", { method: "POST", headers: { "Content-Type": "application/json" },
+                               body: JSON.stringify({ text }) });
+  } catch (err) { /* 엔진 재시작 중 실패는 무시 */ }
+}
+
+function setFocus(nextIdx, isAnnounce = true) {
+  const labels = focusLabels();
+  focusIdx = (nextIdx + labels.length) % labels.length;  // 끝에서 다음 줄 첫째칸(토크백식 랩)
+  render();
+  if (isAnnounce) announce(labels[focusIdx]);
+}
+
+function enterScreen(nextScreen) {
+  screen = nextScreen;
+  focusIdx = 0;
+  if (screen === "confirm") {
+    idFields = null;
+    fetch("/ocr/start", { method: "POST" });
+    announce(`${chosenCert} 본인확인. 주민등록증을 카메라에 보여주세요`);
+  } else if (screen === "done") {
+    announce(`${chosenCert} 발급이 완료되었습니다`);
+  } else {
+    announce("증명서 선택 화면. 발급할 증명서를 선택하세요");
+  }
+  render();
+}
+
+function applyEvent(e) {
+  if (e.class_name === "go_home") { enterScreen("home"); return; }
+  if (e.class_name === "fill_id_fields" && screen === "confirm") {
+    idFields = e.data; render(); return;
+  }
+  if (e.class_name === "move_left")  setFocus(focusIdx - 1);
+  if (e.class_name === "move_right") setFocus(focusIdx + 1);
+  if (e.class_name === "select") {
+    if (screen === "home") { chosenCert = CERTS[focusIdx]; enterScreen("confirm"); }
+    else if (screen === "confirm") {
+      if (CONFIRM_BUTTONS[focusIdx] === "발급하기") {
+        if (!idFields) { showToast("주민등록증을 먼저 인식해 주세요"); announce("주민등록증을 먼저 인식해 주세요"); }
+        else enterScreen("done");
+      } else enterScreen("home");
+    }
+    else enterScreen("home");
+  }
+  // 레거시 이벤트(point/palm_stop/swipe/thumbs_up 등)는 이벤트 로그에만 남긴다
+}
+
+function render() {
+  const s = $("screen");
+  if (screen === "home") {
+    s.innerHTML = `
+      <div class="screen-head"><div class="title">증명서 선택</div>
+        <div class="hint">✊→✋ 이동 · 👌 선택</div></div>
+      <div class="menu">${CERTS.map((c, i) =>
+        `<div class="item ${i === focusIdx ? "hl" : ""}">${c}</div>`).join("")}</div>`;
+  } else if (screen === "confirm") {
+    s.innerHTML = `
+      <div class="screen-head"><div class="title">본인확인 — ${chosenCert}</div>
+        <div class="hint">주민등록증 자동 인식</div></div>
+      <div class="scan-note">📇 주민등록증을 카메라 중앙에 보여주세요.<br>
+        인식되면 아래 칸에 자동으로 입력됩니다. (화면 표시는 마스킹)</div>
+      <div class="idform">
+        <div><label>이름</label>
+          <div class="field ${idFields ? "filled" : ""}">${idFields ? maskName(idFields.name) : ""}</div></div>
+        <div><label>주민등록번호</label>
+          <div class="field ${idFields ? "filled" : ""}">${idFields ? maskRrn(idFields.rrn) : ""}</div></div>
+      </div>
+      <div class="btnrow">${CONFIRM_BUTTONS.map((b, i) =>
+        `<div class="btn ${i === focusIdx ? "hl" : ""}">${b}</div>`).join("")}</div>`;
+  } else {
+    s.innerHTML = `
+      <div class="done"><div class="big">✅ ${chosenCert} 발급 완료</div>
+        <p>출력물을 받아 가세요.<br>👌 OK 또는 🙌 양 손바닥으로 처음 화면으로 돌아갑니다.</p></div>`;
+  }
 }
 
 function showToast(msg) {
-  const t = document.getElementById("toast");
+  const t = $("toast");
   t.textContent = msg; t.style.display = "block";
   setTimeout(() => { t.style.display = "none"; }, 1800);
-}
-
-function applyGesture(name) {
-  const modal = document.getElementById("modal");
-  if (modalOpen) {
-    if (name === "thumbs_up") {
-      modal.style.display = "none"; modalOpen = false;
-      showToast("✅ 결제가 완료되었습니다"); cart = []; renderMenu();
-    } else if (name === "palm_stop") {
-      modal.style.display = "none"; modalOpen = false; showToast("결제를 취소했습니다");
-    }
-    return;
-  }
-  const items = PAGES[pageIdx].items;
-  if (name === "swipe_left")  { pageIdx = (pageIdx - 1 + PAGES.length) % PAGES.length; hlIdx = 0; }
-  if (name === "swipe_right") { pageIdx = (pageIdx + 1) % PAGES.length; hlIdx = 0; }
-  if (name === "point") {
-    cart.push(items[hlIdx]); showToast(`${items[hlIdx][0]} 담김`);
-    hlIdx = (hlIdx + 1) % items.length;
-  }
-  if (name === "palm_stop" && cart.length) { showToast(`${cart.pop()[0]} 취소됨`); }
-  if (name === "thumbs_up") {
-    if (!cart.length) { showToast("장바구니가 비어 있습니다"); }
-    else {
-      const sum = cart.reduce((a, c) => a + c[1], 0);
-      document.getElementById("modal-body").textContent =
-        `${cart.length}개 항목 · 합계 ${sum.toLocaleString()}원`;
-      modal.style.display = "flex"; modalOpen = true;
-    }
-  }
-  renderMenu();
 }
 
 async function poll() {
   try {
     const d = await (await fetch("/data")).json();
-    document.getElementById("s-infer").textContent = d.stats.infer_fps;
-    document.getElementById("s-cap").textContent = d.stats.capture_fps;
-    document.getElementById("s-cpu").textContent = d.stats.cpu;
-    document.getElementById("s-mem").textContent = d.stats.memory;
-    const log = document.getElementById("evlog");
+    $("s-infer").textContent = d.stats.infer_fps;
+    $("s-cap").textContent = d.stats.capture_fps;
+
+    const lock = $("b-lock");
+    lock.className = "badge " + (d.status.is_user_locked ? "on" : "off");
+    lock.textContent = d.status.is_user_locked ? "사용자 고정됨" : "사용자 인식 대기";
+
+    const ocr = $("b-ocr");
+    ocr.className = "badge " + (d.status.is_ocr_mode ? "on" : "off");
+    ocr.textContent = d.status.is_ocr_mode ? "신분증 스캔 중" : "신분증 스캔";
+    if (wasOcrMode && !d.status.is_ocr_mode && screen === "confirm" && !idFields) {
+      showToast("인식 시간이 지났습니다 — 화면을 다시 선택하면 재시도합니다");
+    }
+    wasOcrMode = d.status.is_ocr_mode;
+
+    const wrap = $("holdwrap");
+    wrap.style.display = d.status.two_palm_hold_ratio > 0 ? "block" : "none";
+    $("holdbar").style.width = `${d.status.two_palm_hold_ratio * 100}%`;
+
+    const log = $("evlog");
     log.innerHTML = d.events.slice().reverse().map(e =>
-      `<li><b>${e.class_name}</b> (conf=${e.conf})</li>`).join("");
+      `<li><b>${e.class_name}</b>${e.hand_side ? ` (${e.hand_side})` : ""} conf=${e.conf}</li>`).join("");
     for (const e of d.events) {
-      if (e.ts_sec > lastEventTs) { lastEventTs = e.ts_sec; applyGesture(e.class_name); }
+      if (e.ts_sec > lastEventTs) { lastEventTs = e.ts_sec; applyEvent(e); }
     }
   } catch (err) { /* 서버 재시작 중 폴링 실패는 무시 */ }
 }
-renderMenu();
-setInterval(poll, 300);
+render();
+setInterval(poll, 250);
 </script>
 </body>
 </html>
