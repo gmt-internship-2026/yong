@@ -24,9 +24,13 @@ from src.utils.logger import get_logger
 logger = get_logger("inference")
 
 
-def _ensure_cuda_dlls():
-    """윈도우: torch(cu128)가 등록하는 CUDA DLL 경로 덕에 onnxruntime CUDA가 열리는
-    경우가 있다 — CUDA를 쓰려는데 프로바이더가 안 보이면 torch를 한 번 임포트해 본다."""
+def ensure_cuda_dlls():
+    """윈도우: onnxruntime CUDA는 torch(cu128)가 등록하는 CUDA DLL 경로에 의존한다.
+
+    onnxruntime-gpu가 설치되면 CUDAExecutionProvider는 항상 목록에 보이지만
+    DLL 로드는 세션 생성 시점에 일어나므로(실패 시 조용히 CPU 폴백), CUDA를
+    쓰려면 세션을 만들기 전에 반드시 torch를 먼저 임포트해 둬야 한다.
+    rtmlib(pose_estimator) 등 다른 ORT 세션 생성부도 이 함수를 먼저 부른다."""
     if sys.platform.startswith("win"):
         try:
             import torch  # noqa: F401 — DLL 경로 등록 부수효과만 목적
@@ -44,12 +48,30 @@ class Detection:
     class_name: str
     conf: float
     bbox: tuple  # (x1, y1, x2, y2) 좌상단·우하단 픽셀 좌표 (원본 프레임 기준)
+    hand_side: str = None  # "left"|"right" — 검출기가 손 좌/우를 알면 채운다 (사용자 기준).
+                           # 있으면 person_lock이 손목 거리 대신 이 값으로 좌/우를 정한다
+                           # — 한쪽 팔이 없는 사용자도 인식된다. ONNX 엔진은 None
+
+
+def create_gesture_detector(config):
+    """config model.gesture_engine에 따라 제스처 검출기를 만든다.
+
+    - mediapipe(기본, 라이선스 C안): MediaPipe 손 랜드마크 + 기하 판정 (Apache-2.0)
+    - onnx: 구 HaGRID YOLOv10 — AGPL(ultralytics) 리스크로 납품 금지, 비교 시험용만
+    """
+    engine = config["model"].get("gesture_engine", "mediapipe")
+    if engine == "onnx":
+        logger.warning("gesture_engine=onnx — HaGRID YOLOv10은 AGPL 리스크로 납품 금지 (README 라이선스 절)")
+        return GestureDetector(config)
+    from src.inference.detector_mediapipe import MediaPipeGestureDetector  # 순환 임포트 방지
+
+    return MediaPipeGestureDetector(config)
 
 
 def resolve_providers(device, use_tensorrt, cache_dir):
     """실행 장치 설정 -> onnxruntime 프로바이더 목록 (항상 CPU 폴백 포함)."""
-    if device in ("auto", "cuda") and "CUDAExecutionProvider" not in ort.get_available_providers():
-        _ensure_cuda_dlls()
+    if device in ("auto", "cuda"):
+        ensure_cuda_dlls()
     available = ort.get_available_providers()
     providers = []
     if use_tensorrt and "TensorrtExecutionProvider" in available:

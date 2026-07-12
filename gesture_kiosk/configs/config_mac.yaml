@@ -11,12 +11,22 @@ camera:
   height_px: 720
   mirror: true
   windows_backend: auto   # 맥에서는 무시된다
+  fourcc: mjpg            # 캡처 픽셀 포맷 — 맥 내장 카메라는 무시될 수 있다 (무해)
 
 model:
-  # 라이선스 B안 — ONNX Runtime(MIT) + rtmlib(Apache-2.0). 맥은 CPU 실행(개발 확인용)
+  # 라이선스 C안 — 제스처: MediaPipe(Apache-2.0) + 포즈: rtmlib(Apache-2.0). 맥은 CPU 실행(개발 확인용)
+  gesture_engine: mediapipe
+  mediapipe:
+    hand_landmarker_path: models/weights/hand_landmarker.task
+    num_hands: 2
+    min_tracking_confidence: 0.5
+    finger_extended_ratio: 1.15
+    ok_pinch_ratio: 0.35
+    bbox_pad_ratio: 0.15
+    flip_handedness: true   # config.yaml 주석 참고 (mediapipe 라벨 방향 실측 보정)
   device: auto            # 맥: CUDA 없음 -> 자동으로 cpu
   use_tensorrt: false
-  gesture_onnx_path: models/weights/YOLOv10n_gestures.onnx
+  gesture_onnx_path: models/weights/YOLOv10n_gestures.onnx   # (onnx 엔진 전용 — 납품 금지)
   pose_mode: lightweight  # ★ 맥 CPU — 가벼운 포즈 모델로 개발 확인
   input_size_px: 640
   max_infer_fps: 60
@@ -49,7 +59,7 @@ gestures:
   select: { stable_frame_count: 5, max_static_move_ratio: 0.08 }
   two_palm: { action: go_home, hold_sec: 10.0, grace_sec: 0.4 }
   legacy:
-    enabled: true
+    enabled: false          # config.yaml 주석 참고 (쉬는 손바닥의 palm_stop 간섭)
     stable_frame_count: 5
     max_static_move_ratio: 0.08
     swipe: { source_gesture: open_hand, window_sec: 0.7, min_dist_ratio: 0.35 }

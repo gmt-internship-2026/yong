@@ -11,13 +11,15 @@ OCR_COLOR = (80, 200, 255)       # OCR 모드 안내 영역
 
 
 def draw_bbox(frame, detections):
-    """검출된 제스처 bbox와 이름·conf를 그린다."""
+    """검출된 제스처 bbox와 이름·좌우(L/R)·conf를 그린다 — L/R은 사용자 기준."""
     for det in detections:
         x1, y1, x2, y2 = det.bbox
+        side = getattr(det, "hand_side", None)
+        side_tag = f"[{side[0].upper()}]" if side in ("left", "right") else ""
         cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), BBOX_COLOR, 2)
         cv2.putText(
             frame,
-            f"{det.class_name} {det.conf:.2f}",
+            f"{det.class_name}{side_tag} {det.conf:.2f}",
             (int(x1), int(y1) - 8),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.6,

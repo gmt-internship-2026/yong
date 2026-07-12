@@ -36,9 +36,13 @@
 - [ ] **№7 이벤트 전달 규격 합의** — udp JSON 예시 구현 상태. 소켓/시리얼 등 확정 시 Sender 추가
 - [ ] **№8 통합 범위 확정** — UI 통합까지인지 이벤트 출력까지인지
 - [ ] **№5·№6 KPI 측정 기준 합의** — 정확도 85% 산식 / 30 FPS(엔드투엔드 vs 추론 단독)
-- [ ] **№9 라이선스 검토** — 2026-07-11 **B안 적용 완료**(AGPL 제거: ONNX Runtime(MIT)+rtmlib(Apache-2.0)).
-      잔여 확인 2건: ① HaGRID 고지문(models/weights/NOTICE_HaGRID.md) 제품 문서 포함 방식
-      ② .pt→ONNX 변환에 ultralytics를 도구로 1회 사용한 것의 해석(일반적으로 무관하나 법무 한 줄 확인)
+- [ ] **№9 라이선스 검토** — 2026-07-10 **C안 적용 완료**: 제스처 엔진을 HaGRID YOLOv10(ONNX)
+      → MediaPipe 손 랜드마크(Apache-2.0)로 교체. 사유: YOLOv10은 AGPL-3.0(ultralytics 계열)
+      학습·변환 가중치로, ultralytics 공식 해석상 비공개 상업 사용 시 전체 코드 공개 또는
+      유료 라이선스 필요. 현 스택(MediaPipe·rtmlib·ONNX Runtime·EasyOCR·pyttsx3 무수정)은
+      카피레프트·저작자표시 의무 없음 — 원문 확인 2026-07-10.
+      잔여 확인 1건: 구 ONNX 경로(models/weights/YOLOv10n_gestures.onnx + gesture_engine: onnx)를
+      납품 빌드에서 삭제할지 법무/회사 확정 (현재 비교 시험용 잔존, 기본 미사용)
 - [ ] **№10 코드 저장 위치·백업 정책** — 외부 Git 허용 여부
 - [ ] **№11 (신규) 주민등록번호 처리 법적 근거** — 개인정보보호법 제24조의2.
       민원발급기의 본인확인 목적 처리 근거·보관 정책을 회사/발주처에 확인

@@ -9,15 +9,16 @@ echo     (pip가 이 PC 기준으로 윈도우용 휠을 내려받는다)
 echo  결과물: wheelhouse\ + bundle_models\  → 폴더째 zip으로 반출
 echo ============================================================
 
+REM ⚠ if/for 괄호 블록 안에는 한글을 넣지 말 것 — install.bat 상단 주석 참고
 set PY_CMD=
 py -3.11 --version >nul 2>&1 && set PY_CMD=py -3.11
-if not defined PY_CMD (
-    python --version 2>nul | findstr /C:"3.11" >nul && set PY_CMD=python
-)
-if not defined PY_CMD (
-    echo [FAIL] Python 3.11이 필요합니다 — 대상 PC와 같은 버전으로 준비하세요
-    exit /b 1
-)
+if defined PY_CMD goto :python_found
+python --version 2>nul | findstr /C:"3.11" >nul && set PY_CMD=python
+if defined PY_CMD goto :python_found
+echo [FAIL] Python 3.11이 필요합니다 — 대상 PC와 같은 버전으로 준비하세요
+exit /b 1
+
+:python_found
 
 REM ---- 1) 파이썬 휠 수집 --------------------------------------
 if not exist venv_bundle ( %PY_CMD% -m venv venv_bundle || exit /b 1 )

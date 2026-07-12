@@ -47,6 +47,13 @@ class PersonPose:
 
 def _resolve_device(device):
     """auto -> onnxruntime에 CUDA가 있으면 cuda, 없으면 cpu."""
+    if device == "cpu":
+        return device
+    # rtmlib의 ORT 세션도 torch의 CUDA DLL 경로가 있어야 GPU로 열린다 —
+    # 없으면 조용히 CPU로 폴백해 30 FPS가 무너진다 (2026-07-10 실측: 10 FPS)
+    from src.inference.detector import ensure_cuda_dlls
+
+    ensure_cuda_dlls()
     if device != "auto":
         return device
     import onnxruntime as ort

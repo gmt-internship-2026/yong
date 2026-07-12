@@ -42,11 +42,12 @@ class FakePerson:
 
 
 class FakeDetection:
-    def __init__(self, class_name, cx_px, cy_px, conf=0.9):
+    def __init__(self, class_name, cx_px, cy_px, conf=0.9, hand_side=None):
         half = 40.0
         self.class_name = class_name
         self.conf = conf
         self.bbox = (cx_px - half, cy_px - half, cx_px + half, cy_px + half)
+        self.hand_side = hand_side  # 검출기의 손 좌/우 (사용자 기준) — MediaPipe handedness
 
 
 class FakeClock:
@@ -198,6 +199,64 @@ class AttachDetectionsTest(unittest.TestCase):
         detections = [FakeDetection("fist", 200, 400), FakeDetection("palm", 1100, 400)]
         observations = lock.attach_detections(detections, CLASS_MAP)
         self.assertEqual([o.side for o in observations], ["left", "right"])
+
+
+class HandednessAttachTest(unittest.TestCase):
+    """검출기가 손 좌/우(hand_side)를 아는 경우 — 한쪽 팔이 없는 사용자 지원 (2026-07-10).
+
+    좌/우는 hand_side로 확정하고, 손목 거리는 소유권 검사로만 쓴다.
+    해당 손목 키포인트가 없으면(팔 없음·가림) 잠긴 사람 박스 근접으로 대신 검사한다.
+    mirror=true 기본 — FakePerson의 손목 라벨은 모델(화면) 기준이라 사용자 기준과 반대다.
+    """
+
+    def _locked(self, **person_kwargs):
+        lock, clock = make_lock()
+        person = FakePerson(640, 360, **person_kwargs)
+        for _ in range(3):
+            lock.update(FRAME, [person])
+            clock.tick(1 / 30)
+        return lock
+
+    def test_hand_side_decides_side_near_wrist(self):
+        # 모델 왼손목(500,400) = 사용자 오른손 — hand_side와 손목이 일치하는 정상 케이스
+        lock = self._locked(left_wrist=(500, 400), right_wrist=(800, 400))
+        observations = lock.attach_detections(
+            [FakeDetection("fist", 510, 410, hand_side="right")], CLASS_MAP
+        )
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(observations[0].side, "right")
+
+    def test_one_armed_user_missing_wrist_accepts_inside_person_box(self):
+        # 사용자 왼팔의 손목 키포인트 없음(모델 오른손목 미설정) — 잠긴 사람 박스 안이면 수용
+        lock = self._locked(left_wrist=(500, 400))  # 모델 왼손목만 = 사용자 오른손만 키포인트 존재
+        observations = lock.attach_detections(
+            [FakeDetection("fist", 600, 400, hand_side="left")], CLASS_MAP
+        )
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(observations[0].side, "left")
+
+    def test_missing_wrist_far_from_person_box_is_dropped(self):
+        # 손목 소실 + 잠긴 사람 박스에서 먼 손 = 다른 사람 손으로 보고 무시
+        lock = self._locked(left_wrist=(500, 400))
+        observations = lock.attach_detections(
+            [FakeDetection("fist", 100, 100, hand_side="left")], CLASS_MAP
+        )
+        self.assertEqual(observations, [])
+
+    def test_known_wrist_still_enforces_radius(self):
+        # 해당 손목이 있으면 박스 안이라도 손목 반경(179px)을 벗어나면 무시 — 엄격 유지
+        lock = self._locked(left_wrist=(500, 400), right_wrist=(800, 400))
+        observations = lock.attach_detections(
+            [FakeDetection("fist", 700, 420, hand_side="right")], CLASS_MAP  # 손목에서 201px
+        )
+        self.assertEqual(observations, [])
+
+    def test_disabled_lock_prefers_hand_side_over_screen_half(self):
+        lock, _ = make_lock(make_config(enabled=False))
+        observations = lock.attach_detections(
+            [FakeDetection("fist", 200, 400, hand_side="right")], CLASS_MAP  # 화면 왼쪽 절반
+        )
+        self.assertEqual([o.side for o in observations], ["right"])
 
 
 if __name__ == "__main__":

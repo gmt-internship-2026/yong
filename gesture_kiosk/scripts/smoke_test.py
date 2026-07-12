@@ -45,7 +45,7 @@ def main():
         f"현재 {actual_python}" + ("" if actual_python == expected_python else " ← 배포 기준과 다름 (시험 장비면 무시)"),
     )
 
-    for module_name in ("onnxruntime", "rtmlib", "cv2", "fastapi", "yaml", "numpy"):
+    for module_name in ("mediapipe", "onnxruntime", "rtmlib", "cv2", "fastapi", "yaml", "numpy"):
         try:
             __import__(module_name)
             check(f"{module_name} 임포트", True)
@@ -84,12 +84,13 @@ def main():
     try:
         import numpy as np
 
-        from src.inference.detector import GestureDetector
+        from src.inference.detector import create_gesture_detector
 
-        detector = GestureDetector(config)
+        detector = create_gesture_detector(config)
         dummy = np.zeros((480, 640, 3), dtype=np.uint8)
         detector.infer(dummy)
-        check("더미 프레임 추론 (제스처)", True)
+        check("더미 프레임 추론 (제스처)", True,
+              f"engine={config['model'].get('gesture_engine', 'mediapipe')}")
     except Exception as error:  # 모델 누락·드라이버 문제 등 — 원인 그대로 보여준다
         check("더미 프레임 추론 (제스처)", False, repr(error))
 

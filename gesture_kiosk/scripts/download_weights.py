@@ -22,16 +22,34 @@ from src.utils.config_loader import load_config
 DEFAULT_CONFIG_PATH = os.path.join(ROOT_DIR, "configs", "config.yaml")
 
 
+HAND_LANDMARKER_URL = (
+    "https://storage.googleapis.com/mediapipe-models/hand_landmarker/"
+    "hand_landmarker/float16/1/hand_landmarker.task"
+)
+
+
 def main():
     config = load_config(DEFAULT_CONFIG_PATH)
 
+    task_path = config["model"]["mediapipe"]["hand_landmarker_path"]
+    if os.path.exists(task_path):
+        print(f"[OK] 제스처 랜드마크 모델 확인: {task_path}")
+    else:
+        print(f"[INFO] 제스처 랜드마크 모델 내려받기 (약 8MB): {task_path}")
+        import urllib.request
+
+        os.makedirs(os.path.dirname(task_path), exist_ok=True)
+        try:
+            urllib.request.urlretrieve(HAND_LANDMARKER_URL, task_path)
+        except Exception as error:
+            print(f"[FAIL] 다운로드 실패: {error!r}")
+            print("       내부망이면 인터넷 PC에서 받은 저장소 폴더를 통째로 반입하세요")
+            sys.exit(1)
+        print("[DONE] 제스처 랜드마크 모델 저장 완료")
+
     onnx_path = config["model"]["gesture_onnx_path"]
     if os.path.exists(onnx_path):
-        print(f"[OK] 제스처 ONNX 확인: {onnx_path}")
-    else:
-        print(f"[FAIL] 제스처 ONNX가 없습니다: {onnx_path}")
-        print("       저장소를 다시 받거나, 개발 PC에서 scripts/export_onnx.py로 변환하세요")
-        sys.exit(1)
+        print(f"[INFO] (참고) 구 제스처 ONNX 존재: {onnx_path} — onnx 엔진은 AGPL 리스크로 납품 금지")
 
     pose_mode = config["model"]["pose_mode"]
     print(f"[INFO] 포즈 모델(rtmlib {pose_mode}) 캐시 준비 — 없으면 지금 내려받습니다 (수십 MB)")

@@ -5,7 +5,8 @@
 2.3 디렉터리 구조와 4장 코딩 컨벤션을 따른다.**
 
 - 실행 환경: **윈도우 + NVIDIA GPU + Python 3.11.5** (2026-07-10 타깃 변경 — 정부 민원발급기)
-- 모델: HaGRIDv2 제스처(ONNX) + RTMPose 포즈(사용자 잠금) — **학습 0회, AGPL 없는 상용 안전 스택** (2026-07-11 B안)
+- 모델: MediaPipe 손 랜드마크 제스처(Apache-2.0) + RTMPose 포즈(사용자 잠금) —
+  **학습 0회, 카피레프트 없는 상용 안전 스택** (2026-07-10 C안: AGPL 계열 HaGRID YOLOv10 제거)
 - 학습(파인튜닝)은 별도 `training/` 폴더 담당 (feat/study 브랜치) — 이 폴더는 추론 전용
 
 ## 빠른 시작 (윈도우)
@@ -29,7 +30,10 @@ run.bat            :: 실행 — 브라우저 http://localhost:5000
 | fill_id_fields | 주민등록증 제시 | OCR 모드에서 EasyOCR 판독 | 이름·주민번호 자동 입력 |
 
 - 상하 이동 없음 — **줄 끝에서 다음 줄 첫 칸 랩(토크백식 선형 순회)은 UI 책임**
-- 잠긴 사용자(초점 맞은 얼굴 기준)의 손목 근처 손만 인식 — **다른 사람 손 무시**
+- 왼/오른손 구분은 **손 모양 자체(MediaPipe handedness)** 로 판정 (2026-07-10) —
+  포즈 손목 키포인트가 없어도 동작하므로 **한쪽 팔이 없는 사용자도 인식된다**
+- 잠긴 사용자(초점 맞은 얼굴 기준)의 손만 인식 — **다른 사람 손 무시**
+  (손목 근접 검사, 손목 키포인트 소실 시 잠긴 사람 박스 근접 검사로 폴백)
 - 레거시 동작(point/palm 스와이프/thumbs_up 등 기획서 5.1 초안)은
   `gestures.legacy.enabled`로 병행 유지 중 — 회사 협의(№1) 후 정리
 - "양 손바닥 유지"를 직원 호출로 쓰려면 `gestures.two_palm.action: help_call`
@@ -37,7 +41,7 @@ run.bat            :: 실행 — 브라우저 http://localhost:5000
 ## 처리 흐름
 
 ```
-카메라(스레드) → 거울 반전 → 제스처 검출(ONNX Runtime) + 사람 포즈(rtmlib RTMPose)
+카메라(스레드) → 거울 반전 → 제스처 검출(MediaPipe 손 랜드마크 + 기하 판정) + 사람 포즈(rtmlib RTMPose)
   → 사용자 잠금(person_lock: 얼굴 선명도×크기) → 손 귀속(왼/오른)
   → 동작 판정(gesture_filter FSM) → 이벤트 전송(event_sender) + 음성 안내(announce)
 주민등록증 OCR(easyocr)은 별도 워커 스레드 — UI가 /ocr/start로 요청할 때만
@@ -49,10 +53,11 @@ run.bat            :: 실행 — 브라우저 http://localhost:5000
 gesture_kiosk/
 ├─ install.bat / run.bat / make_offline_bundle.bat  # 윈도우 이식·실행 (설치가이드.md)
 ├─ configs/config.yaml      # 모든 설정값의 단일 출처 — 튜닝은 여기서만
-├─ models/weights/          # 제스처 ONNX(포함) + NOTICE_HaGRID.md + trt_cache(★PC 전용 — 복사 금지)
+├─ models/weights/          # hand_landmarker.task(제스처) + 구 ONNX(납품 금지) + trt_cache(★PC 전용)
 ├─ src/
-│   ├─ capture/camera_stream.py      # USB 카메라 캡처 스레드 (윈도우 DSHOW 기본)
-│   ├─ inference/detector.py         # 제스처 검출 (ONNX Runtime — MIT)
+│   ├─ capture/camera_stream.py      # USB 카메라 캡처 스레드 (윈도우 MSMF 기본)
+│   ├─ inference/detector_mediapipe.py  # 제스처 검출 기본 엔진 (MediaPipe — Apache-2.0)
+│   ├─ inference/detector.py         # 구 ONNX 엔진(HaGRID YOLOv10 — 납품 금지) + 엔진 팩토리
 │   ├─ inference/pose_estimator.py   # 사람 포즈 (rtmlib RTMPose — Apache-2.0)
 │   ├─ postprocess/person_lock.py    # 사용자 잠금 + 손 귀속 (거울 좌/우 보정)
 │   ├─ postprocess/gesture_filter.py # 동작 판정 FSM — 신규 스펙 + 레거시 토글
@@ -91,14 +96,19 @@ gesture_kiosk/
 
 - **주민등록번호 처리 법적 근거(개인정보보호법 제24조의2) — 회사 확인 필수** (docs/TODO.md №11).
   엔진은 프레임·인식값을 저장하지 않고 로그는 마스킹한다 (설치가이드.md F절)
-- **라이선스 B안 적용(2026-07-11)**: AGPL(ultralytics) 제거 — 실행기 ONNX Runtime(MIT),
-  포즈 rtmlib/RTMPose(Apache-2.0), EasyOCR(Apache-2.0). HaGRID는 자체 라이선스(상업 가능,
-  **저작자 표시 필수** → [models/weights/NOTICE_HaGRID.md](models/weights/NOTICE_HaGRID.md)를
-  제품 문서에 포함). 최종 법무 확인은 기획서 9장 №9
+- **라이선스 C안 적용(2026-07-10)**: 제스처 엔진을 HaGRID YOLOv10 → **MediaPipe(Apache-2.0)로 교체**.
+  YOLOv10은 AGPL-3.0(ultralytics 계열) 학습·변환 가중치라 ultralytics의 공식 해석상
+  비공개 상업 사용 시 전체 코드 공개 또는 유료 라이선스가 요구되어 제외했다.
+  현재 스택 전체: MediaPipe(Apache-2.0) · rtmlib/RTMPose(Apache-2.0) · ONNX Runtime(MIT) ·
+  EasyOCR(Apache-2.0) · pyttsx3(MPL-2.0 — 무수정 사용이라 공개 의무 없음) —
+  **카피레프트·저작자 표시 의무 없음**. ⚠ 구 ONNX 경로(`gesture_engine: onnx`)와
+  models/weights/YOLOv10n_gestures.onnx는 비교 시험용 잔존 — **납품 빌드에서 제거할 것**
+  (쓸 경우 NOTICE_HaGRID.md 고지 + AGPL 리스크). 최종 법무 확인은 기획서 9장 №9
 
 ## 참고 링크
 
-- HaGRID (모델·데이터셋): https://github.com/hukenovs/hagrid
+- MediaPipe Hand Landmarker (Apache-2.0): https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker
 - rtmlib (RTMPose, Apache-2.0): https://github.com/Tau-J/rtmlib
 - EasyOCR: https://github.com/JaidedAI/EasyOCR
+- (기록) HaGRID — 구 제스처 모델, C안에서 제외: https://github.com/hukenovs/hagrid
 - (기록) 구 타깃 Jetson Orin Nano 셋업: docs/JETSON_SETUP.md — 2026-07-10 윈도우로 변경되어 보관용

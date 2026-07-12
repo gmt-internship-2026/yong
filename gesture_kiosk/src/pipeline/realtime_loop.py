@@ -15,7 +15,7 @@ import time
 
 from src.announce.announcer import Announcer
 from src.capture.camera_stream import CameraStream
-from src.inference.detector import GestureDetector
+from src.inference.detector import create_gesture_detector
 from src.inference.pose_estimator import PoseEstimator
 from src.inference.preprocessor import Preprocessor
 from src.pipeline.event_sender import create_event_sender
@@ -133,7 +133,7 @@ def run_pipeline(config):
     state = PipelineState()
     camera = CameraStream(config).start()
     preprocessor = Preprocessor(config)
-    detector = GestureDetector(config)
+    detector = create_gesture_detector(config)
     pose_estimator = PoseEstimator(config) if config["person_lock"]["enabled"] else None
 
     first_frame = camera.capture_frame()

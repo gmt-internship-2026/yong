@@ -9,16 +9,34 @@ camera:
   width_px: 1280
   height_px: 720
   mirror: true            # 거울 모드 — 사용자 기준 좌/우와 이동 방향을 일치시킨다
-  windows_backend: dshow  # 윈도우 캡처 백엔드: dshow(권장, 빠른 오픈) | msmf | auto
+  windows_backend: msmf   # 윈도우 캡처 백엔드: msmf | dshow | auto
+                          #   Brio 100 실측(2026-07-10): dshow는 YUY2 720p로만 협상돼 ~5 FPS,
+                          #   msmf는 30 FPS. 오픈이 수십 초 걸리는 장치면 dshow로 되돌릴 것
+  fourcc: mjpg            # 캡처 픽셀 포맷 — 무압축(YUY2) 720p는 USB 한계로 ~5 FPS. auto면 미설정
+                          #   (msmf는 이 설정을 무시하기도 한다 — dshow 계열 카메라용)
 
 model:
-  # 2026-07-11 라이선스 B안 — 실행기: ONNX Runtime(MIT) / 포즈: rtmlib RTMPose(Apache-2.0)
-  device: auto            # auto(CUDA 있으면 사용) | cuda | cpu
+  # 2026-07-10 라이선스 C안 — 제스처: MediaPipe(Apache-2.0) / 포즈: rtmlib RTMPose(Apache-2.0)
+  gesture_engine: mediapipe   # mediapipe(기본 — 라이선스 C안) | onnx(구 HaGRID YOLOv10 —
+                              #   AGPL(ultralytics) 리스크로 상업 납품 금지, 비교 시험 전용)
+  mediapipe:                  # 손 랜드마크 기반 판정 (detector_mediapipe.py)
+    hand_landmarker_path: models/weights/hand_landmarker.task   # 구글 배포 모델 (Apache-2.0)
+    num_hands: 2              # 동시 추적 손 개수 — 양 손바닥 '처음으로' 판정에 2 필요
+    min_tracking_confidence: 0.5
+    finger_extended_ratio: 1.15   # TIP이 PIP보다 손목에서 이 배율 이상 멀면 "손가락 폄"
+    ok_pinch_ratio: 0.35          # 엄지-검지 끝 거리 / 손 크기 — 이 미만이면 OK 판정
+    bbox_pad_ratio: 0.15          # 랜드마크 -> 손 박스 패딩 (person_lock 손목 귀속용)
+    flip_handedness: true         # 좌/우 라벨 뒤집기 — mediapipe 0.10.35가 문서와 반대로
+                                  #   라벨을 내는 것 실측(구글 이슈 #4724). 데모 화면 손 박스의
+                                  #   L/R이 실제 손과 뒤집혀 보이면 이 값을 반전할 것
+  device: auto            # auto(CUDA 있으면 사용) | cuda | cpu — onnx 엔진·포즈에 적용
   use_tensorrt: false     # true면 TensorRT 가속 — 첫 실행 때 이 PC 전용 엔진 캐시 생성 (구 build_engine 대체)
-  gesture_onnx_path: models/weights/YOLOv10n_gestures.onnx   # HaGRIDv2 제스처 (저장소에 포함)
+  gesture_onnx_path: models/weights/YOLOv10n_gestures.onnx   # (onnx 엔진 전용) HaGRIDv2 제스처
   pose_mode: balanced     # rtmlib 포즈 크기: lightweight(빠름) | balanced | performance(정확)
   input_size_px: 640
-  max_infer_fps: 60       # 추론 루프 FPS 상한 — 초과분은 대기 (GPU 낭비 방지)
+  max_infer_fps: 30       # 추론 루프 FPS 상한 — 초과분은 대기 (GPU 낭비 방지)
+                          #   KPI가 30 FPS — 60으로 두면 추론 루프가 캡처 스레드의
+                          #   CPU/GIL을 빼앗아 캡처가 30→15 FPS로 반토막난다 (2026-07-10 실측)
   class_map:              # 모델 출력 class_name -> 표준 제스처. 미등록 클래스는 무시된다
     # --- 신규 스펙 ---
     fist: fist            # 주먹 — "쥐었다 펴기" 이동의 시작 상태
@@ -56,8 +74,9 @@ gestures:
     action: go_home           # go_home(신규 스펙 기본) | help_call(레거시 직원 호출)
     hold_sec: 10.0            # 이 시간 이상 유지되면 확정
     grace_sec: 0.4            # 인식이 잠깐 끊겨도 유지로 보는 허용 시간
-  legacy:                     # 기획서 5.1 초안 동작 — 회사 협의 전까지 병행 유지 (2026-07-10 결정)
-    enabled: true
+  legacy:                     # 기획서 5.1 초안 동작 — 회사 협의(№1) 후 정리 예정
+    enabled: false            # 2026-07-10 기본 꺼짐 — 켜면 쉬고 있는 손바닥이 palm_stop을
+                              #   반복 발사해 쿨다운으로 신규 스펙(이동·선택·처음으로)을 막는다
     stable_frame_count: 5     # 정적(point/palm_stop/thumbs_up) N프레임 연속 판정
     max_static_move_ratio: 0.08
     swipe:

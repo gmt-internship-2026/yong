@@ -35,6 +35,10 @@ def init_camera(config):
         cap = cv2.VideoCapture(device_id)
     if not cap.isOpened():
         raise RuntimeError(f"카메라(device_id={device_id})를 열 수 없습니다")
+    # 무압축(YUY2) 1280x720은 USB 대역폭 한계로 캡처가 ~5 FPS에 묶인다 — MJPG 기본
+    fourcc = config["camera"].get("fourcc", "mjpg")
+    if fourcc and fourcc != "auto":
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*fourcc.upper()))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, config["camera"]["width_px"])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config["camera"]["height_px"])
     return cap

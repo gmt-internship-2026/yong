@@ -187,11 +187,27 @@ class PersonLock:
             return {"left": model_right, "right": model_left}
         return {"left": model_left, "right": model_right}
 
+    def _is_near_locked_person(self, point):
+        """잠긴 사람 박스(+손목 매칭 반경 여유) 안의 점인지 — 손목 소실 시 소유권 폴백."""
+        if self.locked_person is None:
+            return False
+        x1, y1, x2, y2 = self.locked_person.bbox
+        margin = self._wrist_match_px
+        return (x1 - margin) <= point[0] <= (x2 + margin) and (
+            (y1 - margin) <= point[1] <= (y2 + margin)
+        )
+
     def attach_detections(self, detections, class_map):
-        """제스처 검출을 잠긴 사용자의 손목에 귀속시켜 HandObservation 목록으로 바꾼다.
+        """제스처 검출을 잠긴 사용자에게 귀속시켜 HandObservation 목록으로 바꾼다.
+
+        좌/우 판정 (2026-07-10 개선 — 한쪽 팔이 없는 사용자 지원):
+        1순위 det.hand_side(검출기의 손 좌/우 — MediaPipe handedness). 이때 손목 거리는
+        "잠긴 사용자의 손인지" 소유권 검사로만 쓰고, 해당 손목 키포인트가 없으면
+        (한쪽 팔 없음·가림 — 포즈 모델이 환각하기 쉬운 상황) 잠긴 사람 박스 근접으로
+        대신 검사한다. hand_side가 없는 검출(ONNX 엔진)은 기존 최근접 손목 방식.
 
         잠금이 없으면 빈 목록 — 다른 사람 손을 절대 통과시키지 않는다.
-        person_lock.enabled=false면 위치 기반 폴백(화면 좌/우 절반)으로 귀속한다.
+        person_lock.enabled=false면 hand_side, 없으면 화면 좌/우 절반으로 귀속한다.
         """
         observations = []
         if not self.enabled:
@@ -200,32 +216,46 @@ class PersonLock:
                 if gesture is None:
                     continue
                 cx, _ = _center(det.bbox)
-                side = "left" if cx < self._frame_width_px / 2.0 else "right"
+                side = getattr(det, "hand_side", None)
+                if side not in ("left", "right"):
+                    side = "left" if cx < self._frame_width_px / 2.0 else "right"
                 observations.append(
                     HandObservation(side, gesture, det.conf, cx / self._frame_width_px)
                 )
             return observations
 
-        wrists = self.user_wrists()
-        if wrists["left"] is None and wrists["right"] is None:
+        if self.locked_person is None:
             return observations
+        wrists = self.user_wrists()
 
         for det in detections:
             gesture = class_map.get(det.class_name)
             if gesture is None:
                 continue
             det_center = _center(det.bbox)
-            best_side = None
-            best_dist = None
-            for side in ("left", "right"):
-                if wrists[side] is None:
-                    continue
-                dist = math.dist(det_center, wrists[side])
-                if dist <= self._wrist_match_px and (best_dist is None or dist < best_dist):
-                    best_side = side
-                    best_dist = dist
-            if best_side is None:
-                continue  # 잠긴 사용자의 손목 근처가 아니다 — 다른 사람 손으로 보고 무시
+            side_hint = getattr(det, "hand_side", None)
+
+            if side_hint in ("left", "right"):
+                wrist = wrists[side_hint]
+                if wrist is not None:
+                    if math.dist(det_center, wrist) > self._wrist_match_px:
+                        continue  # 잠긴 사용자의 해당 손목 근처가 아니다 — 다른 사람 손
+                elif not self._is_near_locked_person(det_center):
+                    continue      # 손목 키포인트 소실 — 잠긴 사람 박스 밖이면 무시
+                best_side = side_hint
+            else:
+                best_side = None
+                best_dist = None
+                for side in ("left", "right"):
+                    if wrists[side] is None:
+                        continue
+                    dist = math.dist(det_center, wrists[side])
+                    if dist <= self._wrist_match_px and (best_dist is None or dist < best_dist):
+                        best_side = side
+                        best_dist = dist
+                if best_side is None:
+                    continue  # 잠긴 사용자의 손목 근처가 아니다 — 다른 사람 손으로 보고 무시
+
             cx, _ = det_center
             observations.append(
                 HandObservation(best_side, gesture, det.conf, cx / self._frame_width_px)

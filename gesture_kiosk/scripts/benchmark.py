@@ -32,9 +32,9 @@ def main():
     config = load_config(args.config)
     init_logging(config)
 
-    from src.inference.detector import GestureDetector
+    from src.inference.detector import create_gesture_detector
 
-    detector = GestureDetector(config)
+    detector = create_gesture_detector(config)
 
     camera = None
     if args.source == "camera":
