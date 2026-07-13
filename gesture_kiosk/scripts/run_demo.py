@@ -5,7 +5,7 @@
     python scripts/run_demo.py --config configs/config.yaml
     python scripts/run_demo.py --headless          # UI 없이 파이프라인만 (이벤트는 event_output으로)
 
-브라우저 접속: http://<jetson-ip>:5000
+브라우저 접속: http://<장비IP>:5000
 """
 import argparse
 import os

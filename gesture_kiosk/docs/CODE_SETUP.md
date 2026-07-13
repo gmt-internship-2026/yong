@@ -1,14 +1,9 @@
 # 개발 PC 셋업 가이드 (VS Code — 빈 환경 기준)
 
-> ## ⛔ 젯슨에서는 이 문서를 따라 하지 말 것
-> 지금 터미널에서 `uname -m` 결과가 **aarch64**(= Jetson)라면 이 문서를 덮고
-> **[JETSON_SETUP.md](JETSON_SETUP.md)** 로 갈 것. 이 문서대로 설치하면 GPU를 못 쓰는
-> torch가 깔린다 ("driver too old" 오류의 원인).
 > 이 문서는 **개발용 보조 PC**(맥/윈도우/x86 리눅스)에서 코드를 고치고 빠르게
-> 확인하고 싶을 때만 쓰는 선택 사항이다. 젯슨만 쓴다면 이 문서는 아예 필요 없다.
+> 확인하고 싶을 때 쓰는 선택 사항이다. 배포(윈도우 + NVIDIA) 설치는 [설치가이드.md](../설치가이드.md)를 볼 것.
 
 작성: 2026-07-08. 맥(Apple Silicon)·윈도우·리눅스(우분투 x86) 공통, OS별 차이는 각 단계에 표기.
-**Jetson 보드는 같은 리눅스라도 전용 PyTorch 휠이 필요해 절차가 다르다 — [JETSON_SETUP.md](JETSON_SETUP.md)를 볼 것.**
 
 ## 1. 프로그램 설치 (PC에 딱 3개)
 
@@ -29,7 +24,7 @@ VS Code 왼쪽 확장(Extensions) 탭에서 검색해 설치:
 
 ```bash
 # 이미 클론돼 있으면 생략
-gh repo clone G0Sun9M0/GMtech_project      # Private 저장소 — gh auth login 선행
+gh repo clone <GitHub계정>/GMtech_project   # Private 저장소 — gh auth login 선행
 
 # VS Code로 gesture_kiosk 폴더를 연다 (상위 폴더 말고 gesture_kiosk를!)
 code GMtech_project/gesture_kiosk
@@ -72,7 +67,7 @@ python -m unittest discover tests -v
 python scripts/download_weights.py
 
 # ③ 실시간 데모 — 개발 PC에서는 내장/USB 카메라가 USB 웹캠의 대역을 한다
-#    (실전 구성은 어디까지나 Jetson + USB 웹캠. 여기서는 코드 확인용일 뿐)
+#    (실전 구성은 어디까지나 윈도우 + NVIDIA + USB 웹캠. 여기서는 코드 확인용일 뿐)
 python scripts/run_demo.py
 #   브라우저에서 http://localhost:5000 접속
 #   macOS가 카메라 권한을 물으면 "허용"
@@ -89,16 +84,6 @@ python scripts/run_demo.py
 | 카메라가 안 열림 | 맥: 시스템 설정 → 개인정보 보호 → 카메라에서 터미널/VS Code 허용. 리눅스: `sudo usermod -aG video $USER` 후 재로그인. 외장 캠이면 `config.yaml`의 `camera.device_id`를 1, 2로 변경 |
 | 맥에서 MPS 관련 연산 오류 | 터미널에서 `export PYTORCH_ENABLE_MPS_FALLBACK=1` 후 재실행 (미지원 연산만 CPU로 우회) |
 | 추론이 너무 느림 | `python3 -c "import torch; print(torch.backends.mps.is_available())"` 가 True인지 확인 |
-
-## 팁 — VS Code에서 Jetson으로 원격 접속해 개발하기
-
-젯슨에 모니터·키보드를 붙이지 않고, 개발 PC의 VS Code에서 젯슨 안의 코드를 직접 편집·실행할 수 있다:
-
-1. VS Code 확장에서 **Remote - SSH**(Microsoft) 설치
-2. `Cmd+Shift+P` → "Remote-SSH: Connect to Host" → `사용자명@젯슨IP` 입력
-3. 접속 후 젯슨 쪽 `GMtech_project/gesture_kiosk` 폴더를 열면 터미널·실행이 전부 젯슨에서 돈다
-
-이 방식이면 환경 구축은 두 번뿐이다 — 개발 PC는 이 문서, 젯슨은 JETSON_SETUP.md 각 1회.
 
 ## 개발 시 지켜야 할 것 (기획서 4장)
 

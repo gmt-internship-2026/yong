@@ -37,7 +37,7 @@ def main():
 
     expected_python = config["runtime"]["python_version"]
     actual_python = platform.python_version()
-    # 버전 불일치는 경고만 — 시험 장비(맥/젯슨 3.10)에서는 정상 상황.
+    # 버전 불일치는 경고만 — 시험 장비(맥 등 Python 3.10)에서는 정상 상황.
     # 배포(윈도우) PC에서는 반드시 3.11.5인지 이 줄의 출력을 눈으로 확인할 것
     check(
         f"파이썬 버전 (배포 기준 {expected_python})",

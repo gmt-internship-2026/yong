@@ -21,8 +21,7 @@ VS Code로 gesture_kiosk 폴더 열기 → F5 → "데모 실행 (맥 — localh
 
 ## 2. 인터프리터 확인 (자동)
 
-`.vscode/settings.json` 이 파이썬 인터프리터를 `./venv`(**Python 3.10.20** — Jetson JetPack 6와
-버전 일치)로 자동 지정한다. 확인만 하면 된다:
+`.vscode/settings.json` 이 파이썬 인터프리터를 `./venv`(**Python 3.10.20**)로 자동 지정한다. 확인만 하면 된다:
 
 - VS Code 우측 하단 상태바에 `3.10.20 ('venv')` 표시가 있는지 확인
 - 다르게 나오면: `Cmd+Shift+P` → "Python: Select Interpreter" → `./venv/bin/python` 선택

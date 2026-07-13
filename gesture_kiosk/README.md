@@ -1,7 +1,7 @@
 # gesture_kiosk — 제스처 인식 배리어프리 민원발급기 (추론)
 
 (주)광명테크 인턴 프로젝트. USB 카메라 1대로 손 제스처와 주민등록증을 실시간
-인식해 키오스크 프로그램으로 이벤트를 전달한다. **기획서(고성모_기획서.docx)의
+인식해 키오스크 프로그램으로 이벤트를 전달한다. **기획서(기획서.docx)의
 2.3 디렉터리 구조와 4장 코딩 컨벤션을 따른다.**
 
 - 실행 환경: **윈도우 + NVIDIA GPU + Python 3.11.5** (2026-07-10 타깃 변경 — 정부 민원발급기)
@@ -111,4 +111,3 @@ gesture_kiosk/
 - rtmlib (RTMPose, Apache-2.0): https://github.com/Tau-J/rtmlib
 - EasyOCR: https://github.com/JaidedAI/EasyOCR
 - (기록) HaGRID — 구 제스처 모델, C안에서 제외: https://github.com/hukenovs/hagrid
-- (기록) 구 타깃 Jetson Orin Nano 셋업: docs/JETSON_SETUP.md — 2026-07-10 윈도우로 변경되어 보관용
