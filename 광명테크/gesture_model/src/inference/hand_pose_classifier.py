@@ -1,7 +1,8 @@
-"""손 랜드마크 -> 학습된 분류기로 손모양을 판정한다.
+"""손 랜드마크 -> 학습된 분류기로 "손등팔등"인지 판정한다.
 
-detector_mediapipe.py가 예전에 쓰던 손가락 폄/굽힘 기하 규칙 대신, 우리가 직접
-녹화한 데이터로 학습시킨 소형 분류기(ONNX)를 쓴다:
+detector_mediapipe.py가 지금 쓰는 기하 규칙(is_back_of_hand, 손목→검지MCP/새끼MCP
+외적 부호)과 별개로, 우리가 직접 녹화한 데이터로 학습시킨 소형 분류기(ONNX)도
+만든다:
     scripts/collect_landmarks.py  — 손모양별 랜드마크 녹화 (data/<label>/*.npy)
     scripts/train_classifier.py   — PyTorch로 학습 후 ONNX export
     (이 파일)                      — 학습된 ONNX를 onnxruntime으로 추론
@@ -10,10 +11,8 @@ normalize_landmarks()는 데이터 녹화·학습·추론이 전부 공유하는
 정규화가 어긋나면 학습된 모델이 실전에서 무조건 틀어지기 때문에 절대 따로
 구현하면 안 된다.
 
-라벨: fist(주먹)/palm(손바닥)/ok(OK사인)/one(검지만 폄)/like(엄지만 폄) + none.
-none은 "이 중 어떤 것도 아닌 자연스러운 손 모양"을 담은 클래스로, 모델이 애매한
-손 모양을 5개 제스처 중 하나로 억지로 분류해 오탐을 내는 걸 줄이기 위한 것
-(예전 프로젝트의 idle 클래스와 같은 목적).
+라벨: 손등팔등(주먹 쥔 채 손등·팔등이 카메라를 향함) + none(그 외 모든 자연스러운
+손 모양 — 손바닥이 보이거나, 손을 안 들었거나 등). 2클래스 이진 분류.
 """
 import json
 
@@ -21,7 +20,7 @@ import numpy as np
 
 WRIST_IDX = 0
 MIDDLE_MCP_IDX = 9
-LABELS = ["fist", "palm", "ok", "one", "like", "none"]
+LABELS = ["손등팔등", "none"]
 FEATURE_DIM = 21 * 2  # 21개 랜드마크 * (x, y)
 
 

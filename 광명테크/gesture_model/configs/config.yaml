@@ -1,8 +1,9 @@
 # gesture_model 설정 — 모든 튜닝값의 단일 출처. 수정은 이 파일에서만 한다.
 #
-# gesture_kiosk(GMtech_project, 라이선스 C안)를 참고해 이식: MediaPipe Hand
-# Landmarker(Apache-2.0) + 기하학적 규칙 판정. 학습 0회, 즉시 동작.
-# OCR/TTS/웹데모서버/Windows-NVIDIA 배포 도구는 이 프로젝트 범위 밖이라 제외했다.
+# 2026-07 단순화: 동작 하나만 쓴다 — "주먹쥔 상태에서 손등·팔등이 카메라를
+# 향하기만 하면" next_item 이벤트 확정. 손가락 굽힘 정도가 아니라 손의 회전
+# 방향(손등이 보이는지)만 보므로 훨씬 단순하고 견고하다. 이전에 있던
+# select/pause_voice/cancel/go_home/sos_call/prev_item 등은 제거했다.
 
 camera:
   device_id: 0            # 웹캠 장치 번호 (노트북 내장캠은 보통 0)
@@ -14,22 +15,19 @@ camera:
   fourcc: mjpg             # 캡처 픽셀 포맷 — 무압축(YUY2) 720p는 USB 대역폭 한계로 저FPS에 묶임
 
 model:
-  class_map:                # classify_hand_landmarks()가 실제로 반환하는 5개 문자열만 매핑
-    fist: fist               # 주먹 — "쥐었다 펴기" 이동의 시작 상태
-    palm: open_hand          # 손바닥(펴기) — 이동의 끝 상태 + 양손 '처음으로'
-    ok: ok                   # OK 사인 — 선택/확인
-    one: point                # 검지만 폄 (legacy — gestures.legacy.enabled일 때만 이벤트화)
-    like: thumbs_up           # 엄지만 폄 (legacy)
+  class_map:
+    손등팔등: 손등팔등          # detector_mediapipe가 항상 이 클래스 하나만 내보낸다
   mediapipe:
     hand_landmarker_path: models/weights/hand_landmarker.task   # 구글 배포 모델 (Apache-2.0)
-    num_hands: 2              # 동시 추적 손 개수 — 양손바닥 '처음으로' 판정에 2 필요
+    num_hands: 2              # 동시 추적 손 개수
     min_tracking_confidence: 0.5
-    finger_extended_ratio: 1.15   # TIP이 PIP보다 손목에서 이 배율 이상 멀면 "손가락 폄"
-    ok_pinch_ratio: 0.35          # 엄지-검지 끝 거리 / 손 크기 — 이 미만이면 OK 판정
     bbox_pad_ratio: 0.15          # 랜드마크 -> 손 박스 패딩 (person_lock 손목 귀속용)
     flip_handedness: true         # 좌/우 라벨 뒤집기 — mediapipe가 문서와 반대로 라벨을
                                   #   내는 경우가 보고돼 있음(구글 이슈 #4724). 데모 화면 손
                                   #   박스의 L/R이 실제와 뒤집혀 보이면 이 값을 반전할 것
+    flip_orientation: true        # 손등 판정 부호 반전 — 실측 결과 이론상 유도했던 부호가
+                                  #   반대였음(손바닥을 손등으로 오판) 2026-07-15 확인,
+                                  #   그래서 기본값을 true로 바꿈 (detector_mediapipe.is_back_of_hand)
   device: cpu               # 전용 NVIDIA GPU 미확인 — CPU 고정 (rtmlib 포즈 추정에 적용)
   pose_mode: lightweight    # rtmlib 포즈 크기: lightweight(빠름) | balanced | performance(정확)
   max_infer_fps: 30         # 추론 루프 FPS 상한 — 초과분은 대기
@@ -47,34 +45,10 @@ detect:
   conf_threshold: 0.5
   cooldown_sec: 1.0           # 이벤트 확정 직후 입력 무시 시간 — 연타 방지
 
-gestures:                    # 광명테크 공식 "시각장애인 키오스크 제스처 표준안"(8개 동작) 기준
-                              # 동작4(화면 스크롤)는 표준안 자체가 미정이라 미구현
-  next_prev:                  # 동작1·2 — 오른손/왼손 각각 주먹쥐기 유지 = 다음/이전 항목
+gestures:
+  next_item:                  # 주먹쥔 상태로 손등·팔등이 카메라를 향한 채 유지 = next_item
     stable_frame_count: 5     # N프레임 연속 유지 시 확정
-    max_static_move_ratio: 0.08
-  select:                     # 동작3 — OK 사인 유지 = 선택/실행
-    stable_frame_count: 5
-    max_static_move_ratio: 0.08
-  pause_voice:                # 동작5 — 손바닥을 카메라로 펴기 유지(한 손) = 음성안내 일시정지
-    stable_frame_count: 5
-    max_static_move_ratio: 0.08
-  cancel:                     # 동작6 — 왼쪽 손'만' 들기 = 뒤로가기/취소 (손모양 무관, 손목 높이만 봄)
-    hold_sec: 0.5
-    grace_sec: 0.3
-  go_home:                    # 동작7 — 양손 들기 = 홈 화면 이동
-    hold_sec: 0.5
-    grace_sec: 0.3
-  sos_call:                   # 동작8 — 양손을 머리보다 높이 들고 3초 이상 유지 = 도움말/SOS 호출
-    hold_sec: 3.0
-    grace_sec: 0.4
-  legacy:                     # 이전 버전 스와이프/정지 등 — 필요시에만 켠다
-    enabled: false
-    stable_frame_count: 5
-    max_static_move_ratio: 0.08
-    swipe:
-      source_gesture: open_hand   # 손바닥 궤적으로 스와이프 판정 (한 손일 때만)
-      window_sec: 0.7
-      min_dist_ratio: 0.35
+    max_static_move_ratio: 0.08   # 정적 상태로 인정하는 최대 이동량 (프레임 폭 비율)
 
 event_output:
   mode: console            # console | udp

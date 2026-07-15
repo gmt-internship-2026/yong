@@ -12,10 +12,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 
 from src.postprocess.person_lock import (
-    KPT_LEFT_SHOULDER,
+    KPT_LEFT_ELBOW,
     KPT_LEFT_WRIST,
-    KPT_NOSE,
-    KPT_RIGHT_SHOULDER,
+    KPT_RIGHT_ELBOW,
     KPT_RIGHT_WRIST,
     PersonLock,
 )
@@ -23,19 +22,23 @@ from src.postprocess.person_lock import (
 FRAME_WIDTH_PX = 1280
 FRAME_HEIGHT_PX = 720
 
-# 기본 몸 기준점 (raised_hands 테스트용) — 코가 제일 위, 그 아래 어깨
-DEFAULT_NOSE = (640, 200)
-DEFAULT_LEFT_SHOULDER = (600, 280)
-DEFAULT_RIGHT_SHOULDER = (680, 280)
+_ELBOW_VISIBLE_DEFAULT = (500.0, 350.0)  # 팔꿈치 가시성을 명시적으로 안 다루는 테스트용 기본값
 
 
 class FakePerson:
-    """PersonPose와 같은 필드·메서드를 가진 테스트 대역 (rtmlib 임포트 회피)."""
+    """PersonPose와 같은 필드·메서드를 가진 테스트 대역 (rtmlib 임포트 회피).
+
+    left_elbow/right_elbow를 명시하지 않으면, 해당 손목이 설정된 경우에 한해
+    "보임" 기본값을 채운다 — 팔꿈치 가시성을 안 다루는 기존 테스트가 새 요건 때문에
+    깨지지 않게 하기 위함. 팔꿈치가 안 보이는 상황을 테스트하려면 명시적으로
+    left_elbow=None(또는 튜플)을 넘길 것.
+    """
+
+    _UNSET = object()
 
     def __init__(self, center_x, center_y, size_px=200.0,
                  left_wrist=None, right_wrist=None, head_points=None,
-                 nose=DEFAULT_NOSE, left_shoulder=DEFAULT_LEFT_SHOULDER,
-                 right_shoulder=DEFAULT_RIGHT_SHOULDER):
+                 left_elbow=_UNSET, right_elbow=_UNSET):
         half = size_px / 2.0
         self.bbox = (center_x - half, center_y - half, center_x + half, center_y + half)
         self.conf = 0.9
@@ -44,12 +47,16 @@ class FakePerson:
             self.keypoints[KPT_LEFT_WRIST] = (*left_wrist, 0.9)
         if right_wrist is not None:
             self.keypoints[KPT_RIGHT_WRIST] = (*right_wrist, 0.9)
-        if nose is not None:
-            self.keypoints[KPT_NOSE] = (*nose, 0.9)
-        if left_shoulder is not None:
-            self.keypoints[KPT_LEFT_SHOULDER] = (*left_shoulder, 0.9)
-        if right_shoulder is not None:
-            self.keypoints[KPT_RIGHT_SHOULDER] = (*right_shoulder, 0.9)
+
+        if left_elbow is self._UNSET:
+            left_elbow = _ELBOW_VISIBLE_DEFAULT if left_wrist is not None else None
+        if right_elbow is self._UNSET:
+            right_elbow = _ELBOW_VISIBLE_DEFAULT if right_wrist is not None else None
+        if left_elbow is not None:
+            self.keypoints[KPT_LEFT_ELBOW] = (*left_elbow, 0.9)
+        if right_elbow is not None:
+            self.keypoints[KPT_RIGHT_ELBOW] = (*right_elbow, 0.9)
+
         self.head_points = head_points if head_points is not None else [
             (center_x - 20, center_y - half + 30), (center_x + 20, center_y - half + 30)
         ]
@@ -204,6 +211,17 @@ class AttachDetectionsTest(unittest.TestCase):
         observations = lock.attach_detections(detections, CLASS_MAP)
         self.assertEqual(observations, [])
 
+    def test_detection_dropped_when_elbow_not_visible(self):
+        # 손목은 근처에 있어도 그 쪽 팔꿈치가 안 보이면(포즈 신뢰도 부족) 버린다
+        lock, clock = make_lock()
+        person = FakePerson(640, 360, left_wrist=(500, 400), right_wrist=(800, 400),
+                             left_elbow=None, right_elbow=None)
+        for _ in range(3):
+            lock.update(FRAME, [person])
+            clock.tick(1 / 30)
+        observations = lock.attach_detections([FakeDetection("fist", 510, 410)], CLASS_MAP)
+        self.assertEqual(observations, [])
+
     def test_no_lock_passes_nothing(self):
         lock, _ = make_lock()
         detections = [FakeDetection("palm", 500, 400)]
@@ -247,13 +265,22 @@ class HandednessAttachTest(unittest.TestCase):
         self.assertEqual(observations[0].side, "right")
 
     def test_one_armed_user_missing_wrist_accepts_inside_person_box(self):
-        # 사용자 왼팔의 손목 키포인트 없음(모델 오른손목 미설정) — 잠긴 사람 박스 안이면 수용
-        lock = self._locked(left_wrist=(500, 400))  # 모델 왼손목만 = 사용자 오른손만 키포인트 존재
+        # 사용자 왼팔의 손목 키포인트 없음(모델 오른손목 미설정, 팔꿈치는 여전히 보임)
+        # — 잠긴 사람 박스 안이면 수용
+        lock = self._locked(left_wrist=(500, 400), right_elbow=(650, 380))
         observations = lock.attach_detections(
             [FakeDetection("fist", 600, 400, hand_side="left")], CLASS_MAP
         )
         self.assertEqual(len(observations), 1)
         self.assertEqual(observations[0].side, "left")
+
+    def test_missing_wrist_and_elbow_is_dropped(self):
+        # 손목뿐 아니라 팔꿈치까지 안 보이면(팔 전체 미검출) — 박스 안이어도 무시
+        lock = self._locked(left_wrist=(500, 400))  # 모델 오른팔은 손목·팔꿈치 다 없음
+        observations = lock.attach_detections(
+            [FakeDetection("fist", 600, 400, hand_side="left")], CLASS_MAP
+        )
+        self.assertEqual(observations, [])
 
     def test_missing_wrist_far_from_person_box_is_dropped(self):
         # 손목 소실 + 잠긴 사람 박스에서 먼 손 = 다른 사람 손으로 보고 무시
@@ -277,61 +304,6 @@ class HandednessAttachTest(unittest.TestCase):
             [FakeDetection("fist", 200, 400, hand_side="right")], CLASS_MAP  # 화면 왼쪽 절반
         )
         self.assertEqual([o.side for o in observations], ["right"])
-
-
-class RaisedHandsTest(unittest.TestCase):
-    """raised_hands() — 손모양과 무관하게 손목이 어깨/코보다 높은지만 본다.
-
-    기본 기준점: 코 y=200, 양 어깨 y=280 (화면 y는 아래로 증가 — 작을수록 위쪽).
-    """
-
-    def _locked(self, mirror=True, **wrist_kwargs):
-        lock, clock = make_lock(make_config(mirror=mirror))
-        person = FakePerson(640, 500, **wrist_kwargs)
-        for _ in range(3):
-            lock.update(FRAME, [person])
-            clock.tick(1 / 30)
-        return lock
-
-    def test_wrist_above_shoulder_is_raised(self):
-        # 모델 왼손목이 어깨(y=280)보다 위(y=250), 코(y=200)보다는 아래
-        lock = self._locked(left_wrist=(600, 250), right_wrist=(680, 400))
-        raised = lock.raised_hands()
-        self.assertTrue(raised["right"])   # mirror=true — 모델 왼손목 = 사용자 오른손
-        self.assertFalse(raised["left"])
-
-    def test_wrist_below_shoulder_is_not_raised(self):
-        lock = self._locked(left_wrist=(600, 400), right_wrist=(680, 400))
-        raised = lock.raised_hands()
-        self.assertFalse(raised["left"])
-        self.assertFalse(raised["right"])
-
-    def test_wrist_above_nose_is_raised_high(self):
-        lock = self._locked(left_wrist=(600, 150), right_wrist=(680, 400))
-        raised_high = lock.raised_hands(high=True)
-        self.assertTrue(raised_high["right"])
-
-    def test_wrist_above_shoulder_but_below_nose_is_not_raised_high(self):
-        lock = self._locked(left_wrist=(600, 250), right_wrist=(680, 400))
-        raised_high = lock.raised_hands(high=True)
-        self.assertFalse(raised_high["left"])
-        self.assertFalse(raised_high["right"])
-
-    def test_no_mirror_keeps_labels(self):
-        lock = self._locked(mirror=False, left_wrist=(600, 250), right_wrist=(680, 400))
-        raised = lock.raised_hands()
-        self.assertTrue(raised["left"])
-        self.assertFalse(raised["right"])
-
-    def test_no_lock_returns_all_false(self):
-        lock, _ = make_lock()
-        self.assertEqual(lock.raised_hands(), {"left": False, "right": False})
-
-    def test_missing_wrist_keypoint_is_not_raised(self):
-        lock = self._locked(left_wrist=None, right_wrist=(680, 400))
-        raised = lock.raised_hands()
-        self.assertFalse(raised["left"])
-        self.assertFalse(raised["right"])
 
 
 if __name__ == "__main__":

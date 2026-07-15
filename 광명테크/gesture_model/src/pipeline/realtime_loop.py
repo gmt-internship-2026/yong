@@ -20,7 +20,7 @@ from src.postprocess.gesture_filter import GestureFilter
 from src.postprocess.person_lock import PersonLock
 from src.utils.logger import get_logger
 from src.utils.metrics import FpsMeter
-from src.utils.visualize import draw_bbox, draw_hold_progress, draw_person_lock, draw_status
+from src.utils.visualize import draw_bbox, draw_person_lock, draw_status
 
 logger = get_logger("pipeline")
 
@@ -53,15 +53,12 @@ class GesturePipeline:
             persons = self.pose_estimator.infer(frame)
             person_lock.update(frame, persons)
         observations = person_lock.attach_detections(detections, self.class_map)
-        raised = person_lock.raised_hands()
-        raised_high = person_lock.raised_hands(high=True)
 
-        gesture_event = self.gesture_filter.filter_observations(observations, raised, raised_high)
+        gesture_event = self.gesture_filter.filter_observations(observations)
         self.infer_fps_meter.update()
 
         annotated = draw_bbox(frame.copy(), detections)
         annotated = draw_person_lock(annotated, person_lock)
-        annotated = draw_hold_progress(annotated, self.gesture_filter.sos_hold_ratio, "SOS")
         annotated = draw_status(annotated, self.infer_fps_meter.avg_fps, gesture_event)
         return annotated, gesture_event
 

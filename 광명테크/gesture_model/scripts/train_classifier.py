@@ -1,8 +1,8 @@
-"""data/<label>/*.npy 로 손모양 분류기를 학습시켜 ONNX로 export한다.
+"""data/<label>/*.npy 로 "손등팔등" 분류기를 학습시켜 ONNX로 export한다.
 
 collect_landmarks.py가 녹화한 원본 픽셀 랜드마크를 hand_pose_classifier의
 normalize_landmarks()로 정규화해 42차원 벡터로 만들고, 소형 PyTorch MLP로
-fist/palm/ok/one/like/none 6개 클래스를 분류하도록 학습한다.
+손등팔등/none 2클래스를 분류하도록 학습한다.
 
 사용법:
     python scripts/train_classifier.py

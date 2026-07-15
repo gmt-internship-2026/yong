@@ -28,9 +28,8 @@ logger = get_logger("postprocess")
 
 # COCO 17 키포인트 규격 (pose_estimator와 동일 번호 — 모델 무관 고정 스펙이라 여기 직접 둔다.
 # 임포트하면 rtmlib이 딸려 와 단위 테스트가 무거워진다)
-KPT_NOSE = 0
-KPT_LEFT_SHOULDER = 5
-KPT_RIGHT_SHOULDER = 6
+KPT_LEFT_ELBOW = 7
+KPT_RIGHT_ELBOW = 8
 KPT_LEFT_WRIST = 9
 KPT_RIGHT_WRIST = 10
 
@@ -190,33 +189,20 @@ class PersonLock:
             return {"left": model_right, "right": model_left}
         return {"left": model_left, "right": model_right}
 
-    def raised_hands(self, high=False):
-        """잠긴 사용자의 손이 들려있는지 '사용자 기준' 좌/우로 판정한다.
+    def _is_elbow_visible(self, user_side):
+        """잠긴 사용자의 해당 쪽 팔꿈치가 카메라에 보이는지(포즈 키포인트 신뢰도 충분한지).
 
-        손모양(fist/palm 등)과 무관하게 손목의 '높이'만 본다 — 뒤로가기(왼손 들기),
-        홈(양손 들기), SOS(양손을 머리보다 높이) 판정에 쓰인다.
-
-        high=False: 손목이 어깨보다 위 (일반적인 "손 들기")
-        high=True : 손목이 코(머리)보다 위 (SOS용 "높이 들기")
-        반환: {"left": bool, "right": bool}
+        "손등팔등" 판정은 손뿐 아니라 팔꿈치까지 보여야 한다는 요건이라 —
+        손만 프레임 가장자리에 걸쳐 들어온 경우(팔 전체가 안 보임)를 걸러낸다.
+        좌/우 매핑은 user_wrists()와 동일한 거울 보정을 따른다.
         """
         if self.locked_person is None:
-            return {"left": False, "right": False}
-        kp = self.locked_person.keypoints
-
-        def _is_up(wrist_idx, shoulder_idx):
-            if kp[wrist_idx][2] < self._kpt_conf:
-                return False
-            ref_idx = KPT_NOSE if high else shoulder_idx
-            if kp[ref_idx][2] < self._kpt_conf:
-                return False
-            return kp[wrist_idx][1] < kp[ref_idx][1]  # 화면 y는 아래로 증가 — 작을수록 위쪽
-
-        model_left = _is_up(KPT_LEFT_WRIST, KPT_LEFT_SHOULDER)
-        model_right = _is_up(KPT_RIGHT_WRIST, KPT_RIGHT_SHOULDER)
-        if self._is_mirror:
-            return {"left": model_right, "right": model_left}
-        return {"left": model_left, "right": model_right}
+            return False
+        model_left_idx, model_right_idx = (
+            (KPT_RIGHT_ELBOW, KPT_LEFT_ELBOW) if self._is_mirror else (KPT_LEFT_ELBOW, KPT_RIGHT_ELBOW)
+        )
+        model_idx = model_left_idx if user_side == "left" else model_right_idx
+        return self.locked_person.keypoints[model_idx][2] >= self._kpt_conf
 
     def _is_near_locked_person(self, point):
         """잠긴 사람 박스(+손목 매칭 반경 여유) 안의 점인지 — 손목 소실 시 소유권 폴백."""
@@ -239,6 +225,9 @@ class PersonLock:
 
         잠금이 없으면 빈 목록 — 다른 사람 손을 절대 통과시키지 않는다.
         person_lock.enabled=false면 hand_side, 없으면 화면 좌/우 절반으로 귀속한다.
+
+        추가로(enabled=true일 때만) 해당 손 쪽 팔꿈치가 포즈 추정에서 보이지 않으면
+        버린다 — "손등팔등" 판정은 손뿐 아니라 팔꿈치까지 카메라에 보여야 한다.
         """
         observations = []
         if not self.enabled:
@@ -286,6 +275,9 @@ class PersonLock:
                         best_dist = dist
                 if best_side is None:
                     continue  # 잠긴 사용자의 손목 근처가 아니다 — 다른 사람 손으로 보고 무시
+
+            if not self._is_elbow_visible(best_side):
+                continue  # 손만 보이고 팔꿈치가 프레임 밖 — "손등팔등" 요건 미충족
 
             cx, _ = det_center
             observations.append(
