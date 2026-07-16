@@ -25,7 +25,7 @@ if not exist venv_bundle ( %PY_CMD% -m venv venv_bundle || exit /b 1 )
 call venv_bundle\Scripts\activate.bat
 python -m pip install --upgrade pip >nul
 
-echo [INFO] torch (CUDA 12.8 — EasyOCR용) 휠 다운로드...
+echo [INFO] torch (CUDA 12.8 — onnxruntime-gpu DLL 등록용) 휠 다운로드...
 pip download torch==2.11.0+cu128 torchvision==0.26.0+cu128 ^
     --index-url https://download.pytorch.org/whl/cu128 -d wheelhouse || exit /b 1
 echo [INFO] requirements 휠 다운로드 (onnxruntime-gpu·rtmlib 포함)...
@@ -38,10 +38,6 @@ pip install --no-index --find-links wheelhouse -r requirements.txt >nul 2>&1 || 
 python scripts\download_weights.py || exit /b 1
 xcopy /y /q /e "%USERPROFILE%\.cache\rtmlib" bundle_models\rtmlib\ >nul
 
-REM ---- 3) EasyOCR 한국어 모델 수집 ----------------------------
-echo [INFO] EasyOCR 모델 1회 다운로드 (수 분)...
-python -c "import easyocr; easyocr.Reader(['ko','en'], gpu=False)" || exit /b 1
-xcopy /y /q /e "%USERPROFILE%\.EasyOCR\model" bundle_models\easyocr\ >nul
 
 echo.
 echo [DONE] 번들 완성 — 이 프로젝트 폴더 전체를 zip으로 묶어 대상 PC로 옮긴 뒤

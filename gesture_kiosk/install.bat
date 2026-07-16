@@ -41,7 +41,7 @@ python -m pip install --upgrade pip >nul
 REM ---- 3) 패키지 설치 (오프라인 wheelhouse 우선) --------------
 if exist wheelhouse goto :install_offline
 
-echo [INFO] 온라인 설치 — torch는 EasyOCR용 CUDA 12.8 휠 (RTX 50시리즈 포함 지원)
+echo [INFO] 온라인 설치 — torch는 onnxruntime-gpu CUDA DLL 등록용 (RTX 50시리즈 포함 지원)
 pip install torch==2.11.0+cu128 torchvision==0.26.0+cu128 --index-url https://download.pytorch.org/whl/cu128 || goto :pip_fail
 pip install -r requirements.txt || goto :pip_fail
 goto :fix_onnxruntime
@@ -69,11 +69,6 @@ echo [INFO] 포즈 모델 캐시 복사 (오프라인)
 xcopy /y /q /e bundle_models\rtmlib "%USERPROFILE%\.cache\rtmlib\" >nul
 
 :skip_rtmlib_cache
-if not exist bundle_models\easyocr goto :skip_easyocr_cache
-echo [INFO] EasyOCR 한국어 모델 복사 (오프라인)
-xcopy /y /q /e bundle_models\easyocr "%USERPROFILE%\.EasyOCR\model\" >nul
-
-:skip_easyocr_cache
 python scripts\download_weights.py || goto :model_fail
 
 REM ---- 5) 스모크 테스트 ---------------------------------------
