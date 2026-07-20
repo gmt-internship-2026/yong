@@ -1,0 +1,8 @@
+{
+  "labels": [
+    "손등팔등",
+    "none"
+  ],
+  "feature_dim": 42,
+  "hidden_dim": 32
+}
