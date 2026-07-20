@@ -1,20 +1,12 @@
-# 추론(윈도우 + NVIDIA + Python 3.11.5) 고정 버전 — 타 PC 재현성 보장 (설치가이드.md 참고)
+# 추론(윈도우, Python 3.11.5) 고정 버전 — 타 PC 재현성 보장 (설치가이드.md 참고)
 #
-# 2026-07-11 라이선스 B안: ultralytics(AGPL-3.0) 제거 —
-#   실행기 = ONNX Runtime(MIT), 포즈 = rtmlib/RTMPose(Apache-2.0)
-#
-# torch는 윈도우 GPU 배포에서 onnxruntime-gpu의 CUDA DLL 등록용으로만 필요 —
-# install.bat이 별도 설치 (맥/리눅스 CPU 시험은 불필요).
-# 2026-07-16: EasyOCR(주민등록증 OCR) 제거 — 제스처 집중, 관련 의존성 삭제
-# onnxruntime-gpu는 CUDA 12 빌드여야 한다 — torch cu128이 등록하는 CUDA 12.8 DLL을 쓴다.
-#   (1.27.0은 CUDA 13 빌드라 cublasLt64_13.dll을 찾지 못해 조용히 CPU 폴백 — 2026-07-10 확인)
-# ⚠ rtmlib이 CPU용 onnxruntime을 의존성으로 끌고 와 GPU판 파일을 덮어쓴다 —
-#   install.bat이 설치 후 GPU판을 복구한다 (수동 설치 시에도 같은 복구 필요)
-onnxruntime-gpu==1.23.2; sys_platform == "win32"    # 배포(윈도우+NVIDIA) — CUDA 12 실행
-onnxruntime==1.23.2; sys_platform != "win32"        # 맥/리눅스 개발·시험 — CPU 실행
-rtmlib==0.0.15                     # RTMPose 포즈 추정 (Apache-2.0) — 사용자 잠금용
+# 2026-07-18 헤드트래커 전환: 판정 엔진을 rtmlib(RTMPose, 포즈)에서
+#   mediapipe(FaceLandmarker, 얼굴+블렌드셰이프)로 교체. CPU만으로 23 FPS 실측
+#   (2026-07-18, 1280x720 웹캠) — onnxruntime-gpu·torch(CUDA DLL 등록용)·rtmlib를
+#   전부 제거한다. GPU/CUDA 버전 고정이 필요 없어져 설치가 크게 단순해졌다.
+mediapipe==0.10.35                 # 얼굴 랜드마크 + 블렌드셰이프 (Apache-2.0)
 opencv-python==5.0.0.93
-numpy==2.2.6
+numpy==2.4.6                       # 2026-07-18 실측: mediapipe 0.10.35는 numpy 2.x와 호환
 pyyaml==6.0.3
 fastapi==0.139.0
 uvicorn==0.51.0

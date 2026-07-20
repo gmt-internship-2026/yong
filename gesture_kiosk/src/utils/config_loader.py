@@ -11,5 +11,8 @@ def load_config(config_path):
 
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(config_path)))
     config["logging"]["save_dir"] = os.path.join(root_dir, config["logging"]["save_dir"])
+    config["model"]["face_landmarker_path"] = os.path.join(
+        root_dir, config["model"]["face_landmarker_path"]
+    )
     config["root_dir"] = root_dir
     return config

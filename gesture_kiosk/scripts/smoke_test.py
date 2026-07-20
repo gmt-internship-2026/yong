@@ -2,9 +2,11 @@
 
 install.bat 마지막 단계에서 자동 실행된다. 확인 항목:
 1. 파이썬 버전 (배포 기준 3.11.5 — 시험 장비의 다른 버전은 경고만)
-2. 핵심 패키지 임포트 (onnxruntime·rtmlib·cv2·fastapi / 선택: pyttsx3)
-3. GPU 가속 확인 (onnxruntime CUDA — 맥 시험 장비는 CPU 안내)
-4. 더미 프레임 추론 (포즈 — 유일한 모델: 쓸기·끄덕임·잠금 전부 이걸로 판정)
+2. 핵심 패키지 임포트 (mediapipe·cv2·fastapi / 선택: pyttsx3)
+3. 더미 프레임 추론 (얼굴 랜드마크 — 유일한 모델: 커서·선택·뒤로가기 전부 이걸로 판정)
+
+2026-07-18 헤드트래커 전환으로 GPU 가속 확인 항목은 삭제했다 — MediaPipe
+FaceLandmarker는 CPU만으로 23 FPS가 나와(2026-07-18 실측) GPU 자체가 불필요하다.
 
 사용법 (프로젝트 루트에서):
     python scripts/smoke_test.py
@@ -45,24 +47,12 @@ def main():
         f"현재 {actual_python}" + ("" if actual_python == expected_python else " ← 배포 기준과 다름 (시험 장비면 무시)"),
     )
 
-    for module_name in ("onnxruntime", "rtmlib", "cv2", "fastapi", "yaml", "numpy"):
+    for module_name in ("mediapipe", "cv2", "fastapi", "yaml", "numpy"):
         try:
             __import__(module_name)
             check(f"{module_name} 임포트", True)
         except ImportError as error:
             check(f"{module_name} 임포트", False, str(error))
-
-    try:
-        import onnxruntime as ort
-
-        providers = ort.get_available_providers()
-        if "CUDAExecutionProvider" in providers:
-            check("GPU 가속 (onnxruntime CUDA)", True)
-        else:
-            check("GPU 가속", sys.platform == "darwin",
-                  "CPU 실행 — 맥 시험 장비면 정상, 배포(윈도우+NVIDIA) PC라면 onnxruntime-gpu 설치 확인")
-    except ImportError:
-        pass  # 위 임포트 검사에서 이미 FAIL 처리됨
 
     if config["announce"]["enabled"] and config["announce"]["backend"] == "tts":
         try:
@@ -71,18 +61,19 @@ def main():
         except ImportError as error:
             check("pyttsx3 임포트 (음성 안내)", False, str(error))
 
-    # 포즈가 유일한 모델 — 쓸기(손목 궤적)·선택(끄덕임)·잠금이 전부 이걸로 판정 (2026-07-15 2차)
+    # 얼굴 랜드마크가 유일한 모델 — 커서·선택(입/응시)·뒤로가기가 전부 이걸로 판정 (2026-07-18)
     try:
         import numpy as np
 
-        from src.inference.pose_estimator import PoseEstimator
+        from src.inference.face_estimator import FaceEstimator
 
-        pose = PoseEstimator(config)
+        face_estimator = FaceEstimator(config)
         dummy = np.zeros((480, 640, 3), dtype=np.uint8)
-        pose.infer(dummy)
-        check("더미 프레임 추론 (포즈 — 쓸기·끄덕임·잠금)", True)
-    except Exception as error:  # 모델 누락·드라이버 문제 등 — 원인 그대로 보여준다
-        check("더미 프레임 추론 (포즈 — 쓸기·끄덕임·잠금)", False, repr(error))
+        face_estimator.infer(dummy)
+        face_estimator.close()
+        check("더미 프레임 추론 (얼굴 랜드마크 — 커서·선택·뒤로가기)", True)
+    except Exception as error:  # 모델 누락 등 — 원인 그대로 보여준다
+        check("더미 프레임 추론 (얼굴 랜드마크 — 커서·선택·뒤로가기)", False, repr(error))
 
     print()
     if is_all_passed:

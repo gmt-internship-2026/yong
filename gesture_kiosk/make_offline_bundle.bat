@@ -6,7 +6,7 @@ echo ============================================================
 echo  내부망(오프라인) 설치 번들 제작
 echo  ※ 반드시 "인터넷 되는 윈도우 + Python 3.11" PC에서 실행할 것
 echo     (pip가 이 PC 기준으로 윈도우용 휠을 내려받는다)
-echo  결과물: wheelhouse\ + bundle_models\  → 폴더째 zip으로 반출
+echo  결과물: wheelhouse\ + models\weights\face_landmarker.task → 폴더째 zip으로 반출
 echo ============================================================
 
 REM ⚠ if/for 괄호 블록 안에는 한글을 넣지 말 것 — install.bat 상단 주석 참고
@@ -25,19 +25,14 @@ if not exist venv_bundle ( %PY_CMD% -m venv venv_bundle || exit /b 1 )
 call venv_bundle\Scripts\activate.bat
 python -m pip install --upgrade pip >nul
 
-echo [INFO] torch (CUDA 12.8 — onnxruntime-gpu DLL 등록용) 휠 다운로드...
-pip download torch==2.11.0+cu128 torchvision==0.26.0+cu128 ^
-    --index-url https://download.pytorch.org/whl/cu128 -d wheelhouse || exit /b 1
-echo [INFO] requirements 휠 다운로드 (onnxruntime-gpu·rtmlib 포함)...
+echo [INFO] requirements 휠 다운로드 (mediapipe 포함)...
 pip download -r requirements.txt -d wheelhouse || exit /b 1
 echo [INFO] pip 자체도 담는다 (구버전 pip 대비)
 pip download pip -d wheelhouse
 
-REM ---- 2) 포즈(rtmlib) 모델 캐시 수집 --------------------------
+REM ---- 2) 얼굴 랜드마크 모델 파일 받기 --------------------------
 pip install --no-index --find-links wheelhouse -r requirements.txt >nul 2>&1 || pip install -r requirements.txt >nul
 python scripts\download_weights.py || exit /b 1
-xcopy /y /q /e "%USERPROFILE%\.cache\rtmlib" bundle_models\rtmlib\ >nul
-
 
 echo.
 echo [DONE] 번들 완성 — 이 프로젝트 폴더 전체를 zip으로 묶어 대상 PC로 옮긴 뒤

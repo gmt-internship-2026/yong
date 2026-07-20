@@ -1,7 +1,7 @@
 """추론 단독 FPS 벤치마크 — 기획서 6.1 (1,000프레임 평균, 병목 분석용).
 
-2026-07-15 2차: 측정 대상 = 포즈(RTMPose) 단일 모델 — 쓸기·끄덕임·잠금이
-전부 이 추론 위에서 돌므로 이 수치가 곧 판정 엔진의 상한이다.
+2026-07-18 헤드트래커 전환: 측정 대상 = 얼굴 랜드마크(FaceLandmarker) 단일 모델 —
+커서·선택·뒤로가기가 전부 이 추론 위에서 돌므로 이 수치가 곧 판정 엔진의 상한이다.
 
 사용법:
     python scripts/benchmark.py                  # 더미 프레임 1000장
@@ -35,9 +35,9 @@ def main():
     config = load_config(args.config)
     init_logging(config)
 
-    from src.inference.pose_estimator import PoseEstimator
+    from src.inference.face_estimator import FaceEstimator
 
-    pose_estimator = PoseEstimator(config)
+    face_estimator = FaceEstimator(config)
 
     camera = None
     if args.source == "camera":
@@ -56,7 +56,7 @@ def main():
         if camera is not None:
             frame = camera.capture_frame()
         t0 = time.monotonic()
-        pose_estimator.infer(frame)
+        face_estimator.infer(frame)
         latencies_ms.append((time.monotonic() - t0) * 1000.0)
         if (frame_idx + 1) % 100 == 0:
             print(f"  {frame_idx + 1}/{args.frame_count} 프레임 처리")
@@ -64,6 +64,7 @@ def main():
 
     if camera is not None:
         camera.stop()
+    face_estimator.close()
 
     latencies_ms.sort()
     avg_fps = measure_fps(args.frame_count, elapsed_sec)

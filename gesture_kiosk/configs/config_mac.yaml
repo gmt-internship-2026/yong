@@ -3,65 +3,72 @@
 # 원본과 다른 점 (docs/MAC_RUN_LOG.md 참고):
 #   demo_ui.port: 5000 → 5001   (맥 AirPlay 수신기(ControlCenter)가 5000 선점)
 #   announce.backend: tts       (pyttsx3가 맥 nsss로 동작 — 미설치면 자동 log 폴백)
+# 2026-07-18: 헤드트래커 전환 — config.yaml과 함께 갱신 (팔 쓸기 스키마 폐기)
 
 camera:
   device_id: 0            # 맥 내장(MacBook Pro) 카메라
   width_px: 1280
   height_px: 720
+  proc_width_px: 640      # 파이프라인 처리 해상도(16:9 고정) — config.yaml 주석 참고
+  proc_height_px: 360
   mirror: true
   windows_backend: auto   # 맥에서는 무시된다
   fourcc: mjpg            # 캡처 픽셀 포맷 — 맥 내장 카메라는 무시될 수 있다 (무해)
 
 model:
-  # 라이선스(2026-07-15 2차): rtmlib RTMPose(Apache-2.0) 포즈 단일 모델. 맥은 CPU 실행
-  device: auto            # 맥: CUDA 없음 -> 자동으로 cpu
-  use_tensorrt: false
-  pose_mode: lightweight  # ★ 맥 CPU — 가벼운 포즈 모델로 개발 확인
-  input_size_px: 640
+  # 라이선스: MediaPipe(Apache-2.0) 얼굴 랜드마크 단일 모델 — 맥도 CPU로 충분(GPU 불필요)
+  face_landmarker_path: models/weights/face_landmarker.task
+  num_faces: 3
+  min_face_detection_conf: 0.5
+  min_face_presence_conf: 0.5
+  min_tracking_conf: 0.5
+  infer_scale_ratio: 1.0   # 추론 입력 추가 축소 — config.yaml 주석 참고 (proc_*가 이미 작아 1.0)
   max_infer_fps: 30       # 배포와 동일 30 고정(2026-07-16) — 60이면 추론 루프가 캡처
                           #   스레드의 CPU/GIL을 빼앗아 캡처 FPS가 반토막 → 인식 저하
 
 person_lock:
   enabled: true
-  kpt_conf_threshold: 0.3
   lock_frame_count: 3
   follow_radius_ratio: 0.25
   release_sec: 2.0
   sharpness_weight: 0.5
 
-gestures:
-  cooldown_sec: 1.0       # swipe.window_sec보다 길게 (config.yaml 주석 참고)
-  swipe:                    # 임계 단위 = 어깨너비 배수(카메라 거리 무관) — config.yaml 주석 참고
-    window_sec: 0.8
-    min_dist_x_shoulder: 0.55
-    min_dist_y_shoulder: 0.35
-    axis_dominance: 1.5
-    min_track_frames: 4
-    elbow_gain: 2.0         # 손목 미검출 시 팔꿈치 폴백 배율 — config.yaml 주석 참고
-    switch_margin_y_shoulder: 0.2   # 한 팔만 인식 — 활성 팔 교체 여유 (config.yaml 주석 참고)
-    double_within_sec: 1.2      # 아래 쓸기 1회/2연속 판정 창 — config.yaml 주석 참고
-    return_suppress_sec: 1.6    # 반대 방향 1회 삼킴 창 — config.yaml 주석 참고
-    return_origin_shoulder: 0.6     # 복귀 위치 조건 — config.yaml 주석 참고
-    double_return_min_shoulder: 0.15    # 2연속 전 복귀 확인 — config.yaml 주석 참고
-    body_scale:
-      fallback_ratio: 0.22
-      min_ratio: 0.08
-      max_ratio: 0.32         # 근거리 상한 — config.yaml 주석 참고
-      alpha: 0.1
+head_tracker:              # config.yaml과 동일 — 실기(맥) 튜닝 필요 시 이 파일만 조정
+  calibration_window_sec: 0.5
+  pointer:
+    sensitivity_x: 0.8
+    sensitivity_y: 0.5
+    smoothing_alpha: 0.3
+    distance_smoothing_alpha: 0.2
+    max_offset_ratio: 0.5
+  click:
+    min_interval_sec: 0.5
+  mouth_click:
+    enabled: true
+    open_margin: 0.35
+    close_margin: 0.15
+  eye_close_cancel:
+    close_margin: 0.3
+    hold_sec: 0.6
+  dwell_click:
+    enabled: true
+    radius_ratio: 0.04
+    dwell_sec: 1.5
+    require_release_to_rearm: true
+  scroll:
+    enabled: false
+
 announce:
   enabled: true
   backend: tts            # 맥 nsss — pyttsx3 미설치 시 자동 log 폴백
   rate_wpm: 200
   volume: 1.0
   event_templates:
-    move_left: "왼쪽으로 이동"
-    move_right: "오른쪽으로 이동"
     select: "선택했습니다"
-    go_back: "이전 화면으로 이동합니다"
-    go_home: "처음 화면으로 돌아갑니다"
+    go_back: "처음 화면으로 돌아갑니다"
 
 classes:
-  [move_left, move_right, select, go_back, go_home]
+  [select, go_back]
 
 event_output:
   mode: console
@@ -82,4 +89,4 @@ logging:
 runtime:
   python_version: "3.11.5"   # 배포 기준 — 맥 개발 venv(3.10)는 검증용이라 무관
   target_os: windows
-  target_gpu: nvidia
+  target_gpu: none

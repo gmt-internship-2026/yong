@@ -41,8 +41,6 @@ class UdpEventSender:
             "conf": round(gesture_event.conf, 4),
             "ts_sec": gesture_event.ts_sec,
         }
-        if gesture_event.hand_side is not None:
-            payload["hand_side"] = gesture_event.hand_side
         if gesture_event.data is not None:
             # 로그에는 어떤 경우에도 payload 내용물을 남기지 않는다 (개인정보 원칙)
             payload["data"] = gesture_event.data

@@ -3,9 +3,7 @@ data/raw/*
 data/labeled/*
 !data/raw/.gitkeep
 !data/labeled/.gitkeep
-models/weights/*.pt
-models/engines/*.engine
-models/**/*.onnx
+models/weights/*.task
 logs/*.log
 runs/
 __pycache__/
@@ -17,5 +15,3 @@ venv_bundle/
 wheelhouse/
 bundle_models/
 .vscode/
-!models/weights/YOLOv10n_gestures.onnx
-models/weights/trt_cache/

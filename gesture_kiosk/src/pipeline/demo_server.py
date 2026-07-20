@@ -4,11 +4,15 @@ TODO(기획서 9장 №7·№8): 회사 프로그램(UI) 파일을 받으면 이
 제거하고, event_sender.py 규격으로 이벤트만 전달한다.
 
 회사 프로그램 연동 계약(이 서버가 시연하는 것):
-- 이벤트(엔진→UI): /data 폴링 또는 event_output(udp) — move_left/right, select,
-  go_back, go_home (config classes 목록)
+- 이벤트(엔진→UI): /data 폴링(events) 또는 event_output(udp) — select·go_back
+  (config classes 목록). 커서 좌표(cursor_x_ratio/cursor_y_ratio)는 /data status에만
+  실리는 데모 UI 전용 필드다 — UDP 계약은 이산 이벤트만 유지한다(연속 좌표를 매 프레임
+  이벤트 로그에 넣지 않는다). 회사 UI가 실시간 커서가 필요하면 별도 협의 필요(TODO).
 - 음성 안내(UI→엔진): POST /announce {"text": "발급하기 버튼"} — 포커스 항목
   설명처럼 화면 구조를 아는 쪽(UI)이 문구를 만들어 엔진 TTS로 읽힌다
 (2026-07-16: 주민등록증 OCR 기능 제거 — 제스처 집중, /ocr/* 엔드포인트 삭제)
+(2026-07-18: 팔 쓸기 → 헤드트래커 전환 — classes가 move_left/right·go_home 제외,
+ select·go_back 2종으로 축소, 커서 필드 신설)
 """
 import asyncio
 import os
@@ -65,8 +69,6 @@ def create_app(state, config):
         events = []
         for e in state.event_log[-RECENT_EVENT_COUNT:]:
             item = {"class_name": e.class_name, "conf": round(e.conf, 2), "ts_sec": e.ts_sec}
-            if e.hand_side is not None:
-                item["hand_side"] = e.hand_side
             if e.data is not None:
                 item["data"] = e.data
             events.append(item)
@@ -79,6 +81,8 @@ def create_app(state, config):
             },
             "status": {
                 "is_user_locked": state.is_user_locked,
+                "cursor_x_ratio": state.cursor_x_ratio,
+                "cursor_y_ratio": state.cursor_y_ratio,
             },
             "debug": state.debug,   # 판정 계기판 — 실기 튜닝용 (연동 계약 아님)
             "classes": config["classes"],
