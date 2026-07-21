@@ -48,6 +48,7 @@ def draw_debug_panel(frame, debug):
     )
     jaw_baseline = debug.get("jaw_baseline")
     eye_baseline = debug.get("eye_baseline")
+    cheek_baseline = debug.get("cheek_baseline")
     if jaw_baseline is None:
         jaw_line = "JAW -(캘리브레이션 중)"
     else:
@@ -60,7 +61,11 @@ def draw_debug_panel(frame, debug):
             f"  DWELL {debug.get('dwell_progress_ratio', 0):.2f}"
             f"  EYE_HOLD {debug.get('eye_close_progress_ratio', 0):.2f}"
         )
-    lines = [f"CURSOR {cursor_tag}", jaw_line, eye_line]
+    if cheek_baseline is None:
+        cheek_line = "CHEEK -(캘리브레이션 중)"
+    else:
+        cheek_line = f"CHEEK {debug.get('cheek_puff_score', 0):.2f}(base {cheek_baseline:.2f})"
+    lines = [f"CURSOR {cursor_tag}", jaw_line, eye_line, cheek_line]
     for line_idx, line in enumerate(lines):
         y_px = h_px - 14 - 24 * (len(lines) - 1 - line_idx)
         cv2.putText(frame, line, (10, y_px),

@@ -50,6 +50,11 @@ head_tracker:              # config.yaml과 동일 — 실기(맥) 튜닝 필요
   eye_close_cancel:
     close_margin: 0.3
     hold_sec: 0.6
+  recenter_gesture:        # 양 볼 부풀리기 — 커서 재정렬(config.yaml 주석 참고)
+    enabled: true
+    open_margin: 0.5
+    close_margin: 0.3
+    cooldown_sec: 1.0
   dwell_click:
     enabled: true
     radius_ratio: 0.04
@@ -66,9 +71,10 @@ announce:
   event_templates:
     select: "선택했습니다"
     go_back: "처음 화면으로 돌아갑니다"
+    recenter: "커서를 다시 맞췄습니다"
 
 classes:
-  [select, go_back]
+  [select, go_back, recenter]
 
 event_output:
   mode: console

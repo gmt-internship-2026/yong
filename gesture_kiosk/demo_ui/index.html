@@ -51,6 +51,9 @@
   .item.hl, .btn.hl, .key.hl { border-color: var(--focus); background: rgba(77,163,255,0.28);
                        box-shadow: 0 0 18px rgba(77,163,255,0.55); transform: scale(1.04); }
   .btnrow { display: flex; gap: 3%; flex: 1; }
+  /* .btn은 기본적으로 내용(글자 수)에 맞춰 크기가 정해져 "발급하기"/"취소"가 서로
+     다른 너비로 그려졌다(2026-07-21 버그 리포트) — 행 안에서 균등 분할되게 고정 */
+  .btnrow > .btn { flex: 1; }
   .copies { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3%; flex: 1; }
   .done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
           background: rgba(16,20,28,0.55); border-radius: 12px; text-align: center; padding: 20px; }
@@ -127,7 +130,8 @@
 <main>
   <div class="guide">
     <span>😐 코</span>포인터 이동 &nbsp; <span>😮 입 벌리기 / 1.5초 응시</span>선택 &nbsp;
-    <span>😑 양 눈 감고 0.6초</span>뒤로(단계별) · 처음으로(완료 화면)
+    <span>😑 양 눈 감고 0.6초</span>뒤로(단계별) · 처음으로(완료 화면) &nbsp;
+    <span>😗 양 볼 부풀리기</span>커서 재정렬
   </div>
 
   <div class="stage" id="stage">
@@ -294,6 +298,7 @@ function goBack() {
 
 function applyEvent(e) {
   if (e.class_name === "go_back") { goBack(); return; }
+  if (e.class_name === "recenter") { showToast("🎯 커서를 다시 맞췄습니다"); return; }
   if (e.class_name !== "select" || hoveredIdx < 0) return;   // 커서가 항목 밖이면 무시
 
   if (screen === "home") { chosenCert = CERTS[hoveredIdx]; enterScreen("idnum"); return; }
@@ -422,7 +427,8 @@ async function poll() {
     updateEyeProgress(g.eye_close_progress_ratio);
     $("dbg").textContent =
       `입벌림 ${g.jaw_open_score ?? 0}(기준 ${g.jaw_baseline ?? "-"}) · ` +
-      `눈감김 ${g.eye_close_score ?? 0}(기준 ${g.eye_baseline ?? "-"}) · 응시 진행 ${g.dwell_progress_ratio ?? 0}`;
+      `눈감김 ${g.eye_close_score ?? 0}(기준 ${g.eye_baseline ?? "-"}) · ` +
+      `볼부풀림 ${g.cheek_puff_score ?? 0}(기준 ${g.cheek_baseline ?? "-"}) · 응시 진행 ${g.dwell_progress_ratio ?? 0}`;
 
     const log = $("evlog");
     log.innerHTML = d.events.slice().reverse().map(e =>

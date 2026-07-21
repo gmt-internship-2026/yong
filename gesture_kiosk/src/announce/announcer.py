@@ -69,20 +69,24 @@ class Announcer:
     # ----- 워커 스레드 -----
 
     def _worker_loop(self):
-        engine = self._init_tts_engine() if self._backend == "tts" else None
-        while True:
-            text = self._queue.get()
-            if text is STOP_SENTINEL:
-                break
-            if engine is not None:
-                try:
-                    engine.say(text)
-                    engine.runAndWait()
-                except Exception:
-                    logger.exception("TTS 재생 실패 — 이후 안내는 로그로만 출력합니다")
-                    engine = None
-            if engine is None:
-                logger.info("announce(log): %s", text)
+        self._init_com()
+        try:
+            engine = self._init_tts_engine() if self._backend == "tts" else None
+            while True:
+                text = self._queue.get()
+                if text is STOP_SENTINEL:
+                    break
+                if engine is not None:
+                    try:
+                        engine.say(text)
+                        engine.runAndWait()
+                    except Exception:
+                        logger.exception("TTS 재생 실패 — 이후 안내는 로그로만 출력합니다")
+                        engine = None
+                if engine is None:
+                    logger.info("announce(log): %s", text)
+        finally:
+            self._uninit_com()
 
     def _init_tts_engine(self):
         """pyttsx3 엔진을 워커 스레드 안에서 초기화한다. 실패 시 로그 백엔드로 폴백."""
@@ -95,5 +99,27 @@ class Announcer:
             logger.info("TTS 초기화 완료 (pyttsx3, rate=%d)", self._rate_wpm)
             return engine
         except Exception:
-            logger.warning("pyttsx3 초기화 실패 — announce는 로그로만 출력합니다 (backend=log 동작)")
+            # 2026-07-21: warning만 찍고 실제 예외를 버려서 "왜" 실패했는지 재현이
+            # 안 됐다(같은 PC에서 실행마다 성공/실패가 갈림) — exception으로 바꿔 원인 추적
+            logger.exception("pyttsx3 초기화 실패 — announce는 로그로만 출력합니다 (backend=log 동작)")
             return None
+
+    @staticmethod
+    def _init_com():
+        """SAPI(COM)는 이 스레드에서 아파트 초기화가 안 되면 pyttsx3 init이 간헐적으로
+        실패한다 (2026-07-21 실기: 같은 코드가 실행마다 성공/실패가 갈렸다 — 별도
+        threading.Thread는 COM을 자동으로 초기화해 주지 않는다). 맥 등 pythoncom이
+        없는 환경은 조용히 넘어간다."""
+        try:
+            import pythoncom
+            pythoncom.CoInitialize()
+        except ImportError:
+            pass
+
+    @staticmethod
+    def _uninit_com():
+        try:
+            import pythoncom
+            pythoncom.CoUninitialize()
+        except ImportError:
+            pass

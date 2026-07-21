@@ -22,7 +22,7 @@ FRAME_DT_SEC = 1.0 / 30.0
 
 
 def make_face(nose_px=(100.0, 100.0), eye_dist_px=40.0, jaw_open=0.0,
-              eye_close=0.0, eye_close_left=None, eye_close_right=None):
+              eye_close=0.0, eye_close_left=None, eye_close_right=None, cheek_puff=0.0):
     """FaceLandmarks 테스트 대역 — mediapipe 임포트 없이 필요한 신호만 채운다.
 
     eye_close는 양쪽에 같은 값을 채우는 편의 인자 — 좌우를 다르게(윙크) 테스트할
@@ -36,11 +36,13 @@ def make_face(nose_px=(100.0, 100.0), eye_dist_px=40.0, jaw_open=0.0,
         "jawOpen": jaw_open,
         "eyeBlinkLeft": eye_close if eye_close_left is None else eye_close_left,
         "eyeBlinkRight": eye_close if eye_close_right is None else eye_close_right,
+        "cheekPuff": cheek_puff,
     }
     return FaceLandmarks(bbox=(0, 0, 200, 200), conf=1.0, landmarks_px=landmarks_px, blendshapes=blendshapes)
 
 
-def make_config(smoothing_alpha=1.0, distance_smoothing_alpha=1.0, dwell_enabled=True):
+def make_config(smoothing_alpha=1.0, distance_smoothing_alpha=1.0, dwell_enabled=True,
+                 recenter_enabled=True):
     return {
         "head_tracker": {
             "calibration_window_sec": 0.1,
@@ -54,6 +56,10 @@ def make_config(smoothing_alpha=1.0, distance_smoothing_alpha=1.0, dwell_enabled
             "click": {"min_interval_sec": 0.2},
             "mouth_click": {"enabled": True, "open_margin": 0.5, "close_margin": 0.3},
             "eye_close_cancel": {"close_margin": 0.5, "hold_sec": 0.3},
+            "recenter_gesture": {
+                "enabled": recenter_enabled, "open_margin": 0.5, "close_margin": 0.3,
+                "cooldown_sec": 0.2,
+            },
             "dwell_click": {
                 "enabled": dwell_enabled, "radius_ratio": 0.05, "dwell_sec": 0.3,
                 "require_release_to_rearm": True,
@@ -231,6 +237,45 @@ class EyeCloseCancelTest(HeadTrackerTestBase):
             )
             self.clock.tick(FRAME_DT_SEC)
         self.assertEqual(len(result.events), 0)
+
+
+class RecenterGestureTest(HeadTrackerTestBase):
+    def setUp(self):
+        super().setUp(dwell_enabled=False)   # 볼 신호만 격리 (MouthClickTest와 같은 이유)
+
+    def test_cheek_puff_fires_recenter_and_hides_cursor(self):
+        self._settle_calibration()
+        result = self.tracker.update(make_face(cheek_puff=0.9), 1)
+        self.assertEqual(len(result.events), 1)
+        self.assertEqual(result.events[0].class_name, "recenter")
+        self.assertEqual(result.events[0].data["trigger"], "cheek_puff")
+        # 리셋은 다음 프레임부터 반영된다(이번 프레임 커서는 리셋 전에 이미 계산됨) —
+        # 캘리브레이션이 다시 시작돼 다음 프레임은 커서가 미확정 상태다
+        result = self.tracker.update(make_face(cheek_puff=0.1), 1)
+        self.assertIsNone(result.cursor_x_ratio)
+
+    def test_recenter_does_not_reset_mouth_baseline(self):
+        self._settle_calibration()
+        self.tracker.update(make_face(cheek_puff=0.9), 1)   # 재정렬 발화
+        # jaw 기준선은 그대로라 재캘리브레이션 대기 없이 바로 입 벌리기가 먹힌다
+        result = self.tracker.update(make_face(jaw_open=0.8), 1)
+        select_events = [e for e in result.events if e.class_name == "select"]
+        self.assertEqual(len(select_events), 1)
+
+    def test_recenter_respects_cooldown(self):
+        self._settle_calibration()
+        self.tracker.update(make_face(cheek_puff=0.9), 1)
+        self.tracker.update(make_face(cheek_puff=0.1), 1)   # 재장전(히스테리시스 close_margin 아래)
+        self.clock.tick(0.05)                                 # cooldown_sec(0.2) 이내
+        result = self.tracker.update(make_face(cheek_puff=0.9), 1)
+        recenter_events = [e for e in result.events if e.class_name == "recenter"]
+        self.assertEqual(len(recenter_events), 0)
+
+    def test_disabled_recenter_never_fires(self):
+        super().setUp(dwell_enabled=False, recenter_enabled=False)
+        self._settle_calibration()
+        result = self.tracker.update(make_face(cheek_puff=0.9), 1)
+        self.assertEqual(result.events, [])
 
 
 class DwellClickTest(HeadTrackerTestBase):
