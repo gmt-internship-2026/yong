@@ -48,7 +48,7 @@ def draw_debug_panel(frame, debug):
     )
     jaw_baseline = debug.get("jaw_baseline")
     eye_baseline = debug.get("eye_baseline")
-    nose_sneer_baseline = debug.get("nose_sneer_baseline")
+    pucker_baseline = debug.get("mouth_pucker_baseline")
     if jaw_baseline is None:
         jaw_line = "JAW -(캘리브레이션 중)"
     else:
@@ -61,11 +61,11 @@ def draw_debug_panel(frame, debug):
             f"  DWELL {debug.get('dwell_progress_ratio', 0):.2f}"
             f"  EYE_HOLD {debug.get('eye_close_progress_ratio', 0):.2f}"
         )
-    if nose_sneer_baseline is None:
-        nose_line = "NOSE -(캘리브레이션 중)"
+    if pucker_baseline is None:
+        pucker_line = "PUCKER -(캘리브레이션 중)"
     else:
-        nose_line = f"NOSE {debug.get('nose_sneer_score', 0):.2f}(base {nose_sneer_baseline:.2f})"
-    lines = [f"CURSOR {cursor_tag}", jaw_line, eye_line, nose_line]
+        pucker_line = f"PUCKER {debug.get('mouth_pucker_score', 0):.2f}(base {pucker_baseline:.2f})"
+    lines = [f"CURSOR {cursor_tag}", jaw_line, eye_line, pucker_line]
     for line_idx, line in enumerate(lines):
         y_px = h_px - 14 - 24 * (len(lines) - 1 - line_idx)
         cv2.putText(frame, line, (10, y_px),

@@ -22,14 +22,11 @@ FRAME_DT_SEC = 1.0 / 30.0
 
 
 def make_face(nose_px=(100.0, 100.0), eye_dist_px=40.0, jaw_open=0.0,
-              eye_close=0.0, eye_close_left=None, eye_close_right=None, nose_sneer=0.0):
+              eye_close=0.0, eye_close_left=None, eye_close_right=None, mouth_pucker=0.0):
     """FaceLandmarks 테스트 대역 — mediapipe 임포트 없이 필요한 신호만 채운다.
 
     eye_close는 양쪽에 같은 값을 채우는 편의 인자 — 좌우를 다르게(윙크) 테스트할
-    때만 eye_close_left/right를 개별로 지정한다. nose_sneer도 양쪽에 같은 값을
-    채운다 — 판정이 max(좌,우)라 좌우를 다르게 하는 시나리오는 go_back의 윙크
-    테스트처럼 별도로 막아야 할 위험이 없어(오히려 한쪽만 세도 통과해야 정상) 굳이
-    개별 인자를 두지 않았다.
+    때만 eye_close_left/right를 개별로 지정한다.
     """
     landmarks_px = np.zeros((NUM_LANDMARKS, 2), dtype=np.float32)
     landmarks_px[LMK_NOSE_TIP] = nose_px
@@ -39,8 +36,7 @@ def make_face(nose_px=(100.0, 100.0), eye_dist_px=40.0, jaw_open=0.0,
         "jawOpen": jaw_open,
         "eyeBlinkLeft": eye_close if eye_close_left is None else eye_close_left,
         "eyeBlinkRight": eye_close if eye_close_right is None else eye_close_right,
-        "noseSneerLeft": nose_sneer,
-        "noseSneerRight": nose_sneer,
+        "mouthPucker": mouth_pucker,
     }
     return FaceLandmarks(bbox=(0, 0, 200, 200), conf=1.0, landmarks_px=landmarks_px, blendshapes=blendshapes)
 
@@ -245,40 +241,22 @@ class EyeCloseCancelTest(HeadTrackerTestBase):
 
 class RecenterGestureTest(HeadTrackerTestBase):
     def setUp(self):
-        super().setUp(dwell_enabled=False)   # 코 신호만 격리 (MouthClickTest와 같은 이유)
+        super().setUp(dwell_enabled=False)   # 입 오므림 신호만 격리 (MouthClickTest와 같은 이유)
 
-    def test_nose_sneer_fires_recenter_and_hides_cursor(self):
+    def test_mouth_pucker_fires_recenter_and_hides_cursor(self):
         self._settle_calibration()
-        result = self.tracker.update(make_face(nose_sneer=0.9), 1)
+        result = self.tracker.update(make_face(mouth_pucker=0.9), 1)
         self.assertEqual(len(result.events), 1)
         self.assertEqual(result.events[0].class_name, "recenter")
-        self.assertEqual(result.events[0].data["trigger"], "nose_sneer")
+        self.assertEqual(result.events[0].data["trigger"], "mouth_pucker")
         # 리셋은 다음 프레임부터 반영된다(이번 프레임 커서는 리셋 전에 이미 계산됨) —
         # 캘리브레이션이 다시 시작돼 다음 프레임은 커서가 미확정 상태다
-        result = self.tracker.update(make_face(nose_sneer=0.1), 1)
+        result = self.tracker.update(make_face(mouth_pucker=0.1), 1)
         self.assertIsNone(result.cursor_x_ratio)
-
-    def test_one_side_sneer_still_fires(self):
-        # 판정이 max(좌,우)라 한쪽만 세게 잡혀도(카메라 각도·조명으로 반대쪽이 약해도)
-        # 인식돼야 한다 — 원안 cheekPuff가 단일 채널이라 실기에서 미인식이 잦았던
-        # 문제(2026-07-21)를 좌우 중 큰 쪽을 취하는 방식으로 구조적으로 보완했다
-        self._settle_calibration()
-        landmarks_px = np.zeros((NUM_LANDMARKS, 2), dtype=np.float32)
-        landmarks_px[LMK_NOSE_TIP] = (100.0, 100.0)
-        landmarks_px[LMK_LEFT_EYE_OUTER] = (80.0, 100.0)
-        landmarks_px[LMK_RIGHT_EYE_OUTER] = (120.0, 100.0)
-        face = FaceLandmarks(
-            bbox=(0, 0, 200, 200), conf=1.0, landmarks_px=landmarks_px,
-            blendshapes={"jawOpen": 0.0, "eyeBlinkLeft": 0.0, "eyeBlinkRight": 0.0,
-                         "noseSneerLeft": 0.9, "noseSneerRight": 0.0},
-        )
-        result = self.tracker.update(face, 1)
-        self.assertEqual(len(result.events), 1)
-        self.assertEqual(result.events[0].class_name, "recenter")
 
     def test_recenter_does_not_reset_mouth_baseline(self):
         self._settle_calibration()
-        self.tracker.update(make_face(nose_sneer=0.9), 1)   # 재정렬 발화
+        self.tracker.update(make_face(mouth_pucker=0.9), 1)   # 재정렬 발화
         # jaw 기준선은 그대로라 재캘리브레이션 대기 없이 바로 입 벌리기가 먹힌다
         result = self.tracker.update(make_face(jaw_open=0.8), 1)
         select_events = [e for e in result.events if e.class_name == "select"]
@@ -286,17 +264,17 @@ class RecenterGestureTest(HeadTrackerTestBase):
 
     def test_recenter_respects_cooldown(self):
         self._settle_calibration()
-        self.tracker.update(make_face(nose_sneer=0.9), 1)
-        self.tracker.update(make_face(nose_sneer=0.1), 1)   # 재장전(히스테리시스 close_margin 아래)
+        self.tracker.update(make_face(mouth_pucker=0.9), 1)
+        self.tracker.update(make_face(mouth_pucker=0.1), 1)   # 재장전(히스테리시스 close_margin 아래)
         self.clock.tick(0.05)                                 # cooldown_sec(0.2) 이내
-        result = self.tracker.update(make_face(nose_sneer=0.9), 1)
+        result = self.tracker.update(make_face(mouth_pucker=0.9), 1)
         recenter_events = [e for e in result.events if e.class_name == "recenter"]
         self.assertEqual(len(recenter_events), 0)
 
     def test_disabled_recenter_never_fires(self):
         super().setUp(dwell_enabled=False, recenter_enabled=False)
         self._settle_calibration()
-        result = self.tracker.update(make_face(nose_sneer=0.9), 1)
+        result = self.tracker.update(make_face(mouth_pucker=0.9), 1)
         self.assertEqual(result.events, [])
 
 

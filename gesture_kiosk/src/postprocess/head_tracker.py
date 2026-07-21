@@ -10,17 +10,19 @@
 - go_back    : 양 눈 감고 0.6초 버티기(eyeBlinkLeft/Right 둘 다 기준선 이상 유지) —
                 "처음부터"도 겸함(별도 go_home 없음 — 기존 UI가 go_back을 모든 화면에서
                 홈으로 처리). 자연스러운 깜빡임(보통 0.4초 이하)은 hold_sec보다 짧아 걸러진다.
-- recenter   : 코 찡그리기(noseSneerLeft/Right 중 큰 쪽 — max) — 커서 중심을 지금
-                고개 위치로 다시 잡는다(2026-07-21 신설, 2026-07-21 2차: 볼 부풀리기
-                →코 찡그리기로 교체). person_lock 재잠금(자리 이탈)이 유일한
-                재캘리브레이션 경로였던 게 접근성 문제였다(docs/TODO.md №1-신) — 코
-                찡그리기는 입 벌리기·눈 감기와 다른 근육이라 두 동작과 겹치지 않는다.
-                ⚠ 볼 부풀리기(cheekPuff)는 실기에서 인식이 거의 안 됐다(사용자 실측,
-                2026-07-21) — MediaPipe 블렌드셰이프 모델이 이 신호를 약하게 낸다고
-                추정. eyeBlink처럼 좌우 채널이 있는 신호(noseSneerLeft/Right)를 min이
-                아니라 **max**로 묶어 한쪽만 강하게 잡혀도 인식되게 해 같은 문제를
-                구조적으로 피한다(go_back의 min과는 반대 방향 — 여긴 오발화보다
-                미인식이 더 큰 문제라서).
+- recenter   : 입 오므리기(mouthPucker 블렌드셰이프) — 커서 중심을 지금 고개
+                위치로 다시 잡는다(2026-07-21 신설). person_lock 재잠금(자리 이탈)이
+                유일한 재캘리브레이션 경로였던 게 접근성 문제였다(docs/TODO.md №1-신).
+                ⚠ 제스처 변천(2026-07-21, 같은 날 2차례 교체): 원안 볼 부풀리기
+                (cheekPuff) → 코 찡그리기(noseSneerLeft/Right, max) 모두 실기에서
+                인식이 거의 안 됐다(사용자 실측) — MediaPipe 블렌드셰이프 모델이 이런
+                희소 표정 신호를 약하게 낸다고 추정. mouthPucker는 원래 go_back 후보
+                였다가 select(jawOpen)와 같은 입 근육이라 **연속 전환 중** 신호가
+                겹쳐 폐기된 이력이 있지만(설치가이드.md E절 참고), 그건 select와
+                빠르게 번갈아 쓰는 동작이라 문제였던 것 — recenter는 드물고 독립적인
+                동작이라 같은 위험이 훨씬 작고, 무엇보다 그 폐기 이력 자체가
+                MediaPipe가 이 신호는 강하게 잡는다는 실증이라 지금 상황(미인식)에
+                필요한 신호 강도가 있다.
 
 2026-07-20 정확도 개선: 입벌림·눈감김 판정을 **고정 임계값**에서 **잠금 직후 캡처한
 평상시(기준선) + 여유값**으로 바꿨다. 실기 관찰 결과 사람마다 평상시 eyeBlink
@@ -314,7 +316,7 @@ class HeadTracker:
         self._recenter_enabled = recenter["enabled"]
         self._recenter_open_margin = recenter["open_margin"]
         self._recenter_close_margin = recenter["close_margin"]
-        self._nose_sneer_baseline = _MedianCalibrator(calibration_window_sec)
+        self._mouth_pucker_baseline = _MedianCalibrator(calibration_window_sec)
         self._recenter_gate = _ThresholdGate(recenter["cooldown_sec"], clock)
 
         dwell = ht["dwell_click"]
@@ -351,26 +353,22 @@ class HeadTracker:
         eye_close_score = min(
             locked_face.blendshape("eyeBlinkLeft"), locked_face.blendshape("eyeBlinkRight")
         )
-        # 좌우 중 큰 쪽만 넘으면 인정 — go_back(min, 오발화 방지)과 반대로 여긴
-        # 미인식이 더 큰 문제라 min 대신 max로 감도를 높인다 (모듈 docstring 참고)
-        nose_sneer_score = max(
-            locked_face.blendshape("noseSneerLeft"), locked_face.blendshape("noseSneerRight")
-        )
+        mouth_pucker_score = locked_face.blendshape("mouthPucker")
 
         cursor_x, cursor_y = self._cursor_mapper.update(nose_px, interocular_dist_px, now_sec)
-        # 코 캘리브레이션과 같은 구간에서 입/눈/코찡그림 평상시 기준선도 함께 잡는다 (모듈 docstring 참고)
+        # 코 캘리브레이션과 같은 구간에서 입/눈/오므림 평상시 기준선도 함께 잡는다 (모듈 docstring 참고)
         jaw_baseline = self._jaw_baseline.update(jaw_open_score, now_sec)
         eye_baseline = self._eye_baseline.update(eye_close_score, now_sec)
-        nose_sneer_baseline = self._nose_sneer_baseline.update(nose_sneer_score, now_sec)
+        mouth_pucker_baseline = self._mouth_pucker_baseline.update(mouth_pucker_score, now_sec)
 
         events = self._detect_events(
             cursor_x, cursor_y, jaw_open_score, jaw_baseline, eye_close_score, eye_baseline,
-            nose_sneer_score, nose_sneer_baseline, now_sec,
+            mouth_pucker_score, mouth_pucker_baseline, now_sec,
         )
 
         self._update_debug(
             cursor_x, cursor_y, jaw_open_score, jaw_baseline, eye_close_score, eye_baseline,
-            nose_sneer_score, nose_sneer_baseline,
+            mouth_pucker_score, mouth_pucker_baseline, locked_face.blendshapes,
         )
         return HeadTrackerResult(
             cursor_x_ratio=cursor_x, cursor_y_ratio=cursor_y,
@@ -378,7 +376,7 @@ class HeadTracker:
         )
 
     def _detect_events(self, cursor_x, cursor_y, jaw_open_score, jaw_baseline,
-                        eye_close_score, eye_baseline, nose_sneer_score, nose_sneer_baseline, now_sec):
+                        eye_close_score, eye_baseline, mouth_pucker_score, mouth_pucker_baseline, now_sec):
         events = []
         # 기준선이 아직 안 잡혔으면(캘리브레이션 중) 입/눈/코 판정은 보류 — 커서와 동일한 전제
         if self._mouth_enabled and jaw_baseline is not None:
@@ -399,17 +397,17 @@ class HeadTracker:
                     class_name="go_back", conf=eye_close_score, ts_sec=now_sec,
                     data={"trigger": "eye_close"},
                 ))
-        if self._recenter_enabled and nose_sneer_baseline is not None:
-            open_threshold = nose_sneer_baseline + self._recenter_open_margin
-            close_threshold = nose_sneer_baseline + self._recenter_close_margin
-            if self._recenter_gate.update(nose_sneer_score, open_threshold, close_threshold):
+        if self._recenter_enabled and mouth_pucker_baseline is not None:
+            open_threshold = mouth_pucker_baseline + self._recenter_open_margin
+            close_threshold = mouth_pucker_baseline + self._recenter_close_margin
+            if self._recenter_gate.update(mouth_pucker_score, open_threshold, close_threshold):
                 # 커서 중심만 다시 잡는다 — 입/눈 기준선까지 건드리면 재정렬 직후
                 # 잠깐 select/go_back이 먹통이 되는 불필요한 부작용이 생긴다
                 self._cursor_mapper.reset()
-                logger.info("gesture_event: recenter (trigger=nose_sneer, conf=%.2f)", nose_sneer_score)
+                logger.info("gesture_event: recenter (trigger=mouth_pucker, conf=%.2f)", mouth_pucker_score)
                 events.append(GestureEvent(
-                    class_name="recenter", conf=nose_sneer_score, ts_sec=now_sec,
-                    data={"trigger": "nose_sneer"},
+                    class_name="recenter", conf=mouth_pucker_score, ts_sec=now_sec,
+                    data={"trigger": "mouth_pucker"},
                 ))
         return events
 
@@ -427,7 +425,7 @@ class HeadTracker:
         self._cursor_mapper.reset()
         self._jaw_baseline.reset()
         self._eye_baseline.reset()
-        self._nose_sneer_baseline.reset()
+        self._mouth_pucker_baseline.reset()
         self._mouth_gate.reset()
         self._eye_close_gate.reset()
         self._recenter_gate.reset()
@@ -436,7 +434,7 @@ class HeadTracker:
 
     def _update_debug(self, cursor_x, cursor_y, jaw_open_score=0.0, jaw_baseline=None,
                        eye_close_score=0.0, eye_baseline=None,
-                       nose_sneer_score=0.0, nose_sneer_baseline=None):
+                       mouth_pucker_score=0.0, mouth_pucker_baseline=None, all_blendshapes=None):
         self.debug = {
             "cursor_x_ratio": None if cursor_x is None else round(cursor_x, 3),
             "cursor_y_ratio": None if cursor_y is None else round(cursor_y, 3),
@@ -446,6 +444,10 @@ class HeadTracker:
             "eye_baseline": None if eye_baseline is None else round(eye_baseline, 2),
             "eye_close_progress_ratio": round(self._eye_close_gate.progress_ratio, 2),
             "dwell_progress_ratio": round(self._dwell_detector.progress_ratio, 2),
-            "nose_sneer_score": round(nose_sneer_score, 2),
-            "nose_sneer_baseline": None if nose_sneer_baseline is None else round(nose_sneer_baseline, 2),
+            "mouth_pucker_score": round(mouth_pucker_score, 2),
+            "mouth_pucker_baseline": None if mouth_pucker_baseline is None else round(mouth_pucker_baseline, 2),
+            # 2026-07-21 2차: 제스처 후보를 두 번 연속 잘못 골라(cheekPuff·noseSneer
+            # 모두 실기 미인식) 추가 — 전체 블렌드셰이프 원점수를 노출해 다음부터는
+            # 추측이 아니라 실측으로 후보를 고른다 (판정에는 미사용, 진단 전용)
+            "all_blendshapes": {k: round(v, 2) for k, v in (all_blendshapes or {}).items()},
         }
