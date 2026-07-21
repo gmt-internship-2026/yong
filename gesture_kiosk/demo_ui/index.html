@@ -131,7 +131,7 @@
   <div class="guide">
     <span>😐 코</span>포인터 이동 &nbsp; <span>😮 입 벌리기 / 1.5초 응시</span>선택 &nbsp;
     <span>😑 양 눈 감고 0.6초</span>뒤로(단계별) · 처음으로(완료 화면) &nbsp;
-    <span>😗 양 볼 부풀리기</span>커서 재정렬
+    <span>😣 코 찡그리기</span>커서 재정렬
   </div>
 
   <div class="stage" id="stage">
@@ -428,7 +428,7 @@ async function poll() {
     $("dbg").textContent =
       `입벌림 ${g.jaw_open_score ?? 0}(기준 ${g.jaw_baseline ?? "-"}) · ` +
       `눈감김 ${g.eye_close_score ?? 0}(기준 ${g.eye_baseline ?? "-"}) · ` +
-      `볼부풀림 ${g.cheek_puff_score ?? 0}(기준 ${g.cheek_baseline ?? "-"}) · 응시 진행 ${g.dwell_progress_ratio ?? 0}`;
+      `코찡그림 ${g.nose_sneer_score ?? 0}(기준 ${g.nose_sneer_baseline ?? "-"}) · 응시 진행 ${g.dwell_progress_ratio ?? 0}`;
 
     const log = $("evlog");
     log.innerHTML = d.events.slice().reverse().map(e =>
