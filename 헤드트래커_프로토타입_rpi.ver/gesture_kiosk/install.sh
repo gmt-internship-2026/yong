@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gesture_kiosk 설치 (라즈베리파이5, Python 3.11) — win.ver install.bat과 동일한 순서.
+# gesture_kiosk 설치 (라즈베리파이5, Python 3.11.5) — win.ver install.bat과 동일한 순서.
 # 실행: bash install.sh   (또는 chmod +x install.sh 후 ./install.sh)
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -58,8 +58,8 @@ pip install --upgrade pip -q
 # ---- 4) 패키지 설치 ---------------------------------------------------------
 echo "[INFO] pip 패키지 설치..."
 if ! pip install -r requirements.txt; then
-  echo "[FAIL] 패키지 설치 실패 — mediapipe/opencv-python의 aarch64 휠 존재 여부를 확인하세요"
-  echo "       (requirements.txt 상단 주석 참고, 버전 핀을 범위로 완화 후 재시도)"
+  echo "[FAIL] 패키지 설치 실패 — mediapipe(가장 흔한 원인: aarch64 휠 없는 버전)의"
+  echo "       requirements.txt 상단 주석 참고, 버전 핀을 범위로 완화하거나 낮춰서 재시도"
   exit 1
 fi
 
