@@ -1,3 +1,26 @@
-.DS_Store
+﻿yolov8_cls_env/
+venv/
 __pycache__/
 *.pyc
+.DS_Store
+.venv/
+*.csv
+*.zip
+*.sh
+*.dll
+
+# 2026-07-22 저장소 루트를 My_project로 확장하며 추가
+# (.gitignore는 패턴 뒤에 같은 줄로 주석을 못 붙인다 — 반드시 별도 줄. 처음에 같은 줄에
+#  달았다가 패턴 전체가 주석 텍스트까지 포함해버려 무시가 안 걸리는 버그를 겪었다)
+#
+# Claude Code 로컬 설정(로컬 경로·사용자명 포함) — 팀 저장소엔 불필요.
+# 슬래시 없는 패턴이라 하위 어디의 .claude/든 전부 걸린다(win.ver 안의 것 포함)
+.claude/
+#
+# GMtech_project_CPU·GPU — 이미 별도 GitHub(G0Sun9M0/GMtech_project)에 연결된
+# 독립 저장소라 여기선 제외 (내용을 원격에서 다시 확인 가능)
+/프로토타입_1/
+
+# 위 *.sh 규칙 예외 — 라즈베리파이판 실행 진입점이라 반드시 추적해야 한다
+!헤드트래커_프로토타입_rpi.ver/gesture_kiosk/install.sh
+!헤드트래커_프로토타입_rpi.ver/gesture_kiosk/run.sh
