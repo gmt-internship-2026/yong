@@ -23,9 +23,12 @@
 - [ ] **`configs/config.yaml`의 추정값 검증** — `proc_width_px/proc_height_px`(480x270)·
       `num_faces`(2)·`infer_scale_ratio`(1.0)를 `scripts/benchmark.py` 실측 기준으로
       재조정. 설치가이드.md "G. 성능 튜닝" 절 참고.
-- [ ] **mediapipe·opencv-python aarch64 휠 존재 확인** — `requirements.txt`에 박은
-      버전이 라즈베리파이OS(Bookworm, aarch64)에서 그대로 설치되는지. 안 되면 버전
-      범위를 완화.
+- [x] ~~**mediapipe·opencv-python aarch64 휠 존재 확인**~~ — 2026-07-22 사용자 실기에서
+      `mediapipe==0.10.35`(win.ver와 동일 버전) 설치가 휠 문제로 실패해 확인됨. PyPI
+      조회 결과 구글이 0.10.18 이후로 리눅스 aarch64 휠 배포를 중단한 것으로 확인 —
+      `mediapipe==0.10.18`(aarch64+cp311 휠 존재)로 낮추고, 그에 맞춰 `numpy<2`로
+      조정, 자체 `opencv-python` 핀은 제거(mediapipe의 opencv-contrib-python
+      의존성이 자동 해결됨). `requirements.txt` 상단 주석 참고.
 - [ ] **picamera2 백엔드 실기 테스트** — `src/capture/camera_stream.py`의
       `_open_picamera2`/`_capture_loop_picamera2`가 실제 카메라 모듈에서 정상 동작하는지
       (BGR888 포맷 요청이 의도대로 나오는지 포함).
