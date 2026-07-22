@@ -117,9 +117,10 @@ logging:
   save_dir: logs/
 
 runtime:                  # 배포 기준 명세 — 설치가이드.md와 일치해야 한다
-  python_version: "3.11"   # 라즈베리파이OS(Bookworm) 기본 제공 python3(3.11계열) 사용 —
-                          #   win.ver는 3.11.5로 패치버전까지 고정하지만, 데비안 apt는
-                          #   임의 패치버전 지정이 어려워 마이너 버전(3.11)까지만 고정
+  python_version: "3.11.5"  # win.ver와 동일 패치버전까지 고정.
+                          #   2026-07-22 실기: 라즈베리파이OS 릴리스에 따라 기본 python3가
+                          #   3.11이 아닐 수 있어(예: 3.13, Debian trixie 기반 이미지) apt만으론
+                          #   못 맞춘다 — pyenv로 소스 빌드 필요(설치가이드.md "A-1" 절)
   target_os: linux
   target_platform: raspberry_pi_5   # 8GB 모델 확인(2026-07-22) — CPU(Cortex-A76 4코어)는
                           #   전 RAM 변형(2/4/8/16GB)이 동일해 proc_*·num_faces 등

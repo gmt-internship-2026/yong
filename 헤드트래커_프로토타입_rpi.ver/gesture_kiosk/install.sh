@@ -9,16 +9,25 @@ echo " gesture_kiosk 설치 (라즈베리파이5, aarch64)"
 echo " 판정 엔진: MediaPipe FaceLandmarker — CPU 추론(GPU 불필요)"
 echo "============================================================"
 
-# ---- 1) Python 3.11 확인 -------------------------------------------------
+# ---- 1) Python 3.11.5 확인 -------------------------------------------------
+# 2026-07-22 실기: 라즈베리파이OS 릴리스에 따라 기본 python3가 3.11이 아니라
+#   3.13(Debian 13/trixie 기반 이미지) 등으로 다를 수 있다 — apt는 현재 릴리스가
+#   제공하는 버전 하나만 주기 때문에, win.ver와 정확히 같은 3.11.5를 맞추려면
+#   pyenv로 소스 빌드해야 한다(설치가이드.md "A-1. Python 3.11.5 맞추기" 참고):
+#     curl https://pyenv.run | bash
+#     pyenv install 3.11.5
+#     pyenv local 3.11.5   # 이 폴더에서 실행 — 시스템 python3는 안 건드림
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "[FAIL] python3을 찾지 못했습니다 — 라즈베리파이OS(Bookworm)는 기본 내장입니다"
+  echo "[FAIL] python3을 찾지 못했습니다"
   exit 1
 fi
 PY_VER=$(python3 --version | awk '{print $2}')
 echo "[INFO] python3 ${PY_VER} 사용"
 case "$PY_VER" in
-  3.11.*) ;;
-  *) echo "[경고] 배포 기준은 3.11.x 입니다 — 현재 ${PY_VER} (대체로 동작하나 기준과 다름)" ;;
+  3.11.5) ;;
+  3.11.*) echo "[경고] 배포 기준은 3.11.5 입니다 — 현재 ${PY_VER} (패치 버전만 다름, 대체로 동작)" ;;
+  *) echo "[경고] 배포 기준은 3.11.5 입니다 — 현재 ${PY_VER}"
+     echo "       정확히 맞추려면 pyenv install 3.11.5 && pyenv local 3.11.5 후 재실행 (설치가이드.md 참고)" ;;
 esac
 
 # ---- 2) 시스템 패키지 -----------------------------------------------------
